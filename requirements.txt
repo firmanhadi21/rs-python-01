@@ -1,0 +1,28 @@
+# Cisokan OBIA pipeline — Python 3.14, macOS arm64
+# rasterio and pyogrio ship GDAL bundled in their macOS arm64 wheels;
+# no system GDAL install needed.
+
+# Core scientific
+numpy
+pandas
+scipy
+scikit-learn
+
+# Geospatial
+geopandas
+rasterio>=1.5
+rioxarray
+xarray
+shapely
+pyogrio
+pyproj
+
+# Earth Engine (build_sar_features.py, ee_init.py, download_meta_canopy_v2.py)
+earthengine-api
+
+# Visualisation (separability_plot.py, spectral_signature_plot.py)
+matplotlib
+
+# SAM segmentation (sam_run.py) — optional; install separately if needed
+# pip install torch samgeo
+# torch build depends on platform (MPS on Apple Silicon, CUDA on Linux/GPU)
