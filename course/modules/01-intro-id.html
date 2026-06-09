@@ -1,0 +1,168 @@
+<section class="module" id="module-1" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">01</span>
+      <h1 class="module-title">Dari Satelit ke Peta Hutan</h1>
+      <p class="module-subtitle">Apa yang dilakukan pipeline ini — dan apa yang terjadi saat Anda menjalankannya</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- Screen 1: The product -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Citra satelit masuk. Peta hutan keluar.</h2>
+        <p>DAS Cisokan di Jawa Barat merupakan mosaik sawah, perkebunan, hutan, dan bangunan — dan dari luar angkasa, sulit membedakannya. Pipeline ini membaca citra satelit dan secara otomatis memberi label setiap petak lahan dengan salah satu dari sembilan kelas tutupan lahan.</p>
+        <p>Hasilnya adalah peta <span class="term" data-definition="Raster adalah kumpulan piksel berbentuk grid, seperti foto — tetapi alih-alih warna, setiap piksel menyimpan nomor kelas tutupan lahan. Bayangkan seperti peta panas di mana warnanya berarti &quot;hutan&quot; atau &quot;sawah&quot; ketimbang suhu.">raster</span> di mana setiap piksel menjawab: <em>apa lahan ini?</em></p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🛰️</div>
+            <h4 class="pattern-title">Input</h4>
+            <p class="pattern-desc">10 citra satelit PlanetScope selama 2 tahun, ditambah data radar dan ketinggian kanopi</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">⚙️</div>
+            <h4 class="pattern-title">Pipeline</h4>
+            <p class="pattern-desc">12 skrip Python yang melakukan segmentasi, pengukuran, dan klasifikasi — berjalan 45–90 menit pada awal pertama</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">🗺️</div>
+            <h4 class="pattern-title">Output</h4>
+            <p class="pattern-desc">Peta tutupan lahan 9 kelas dengan resolusi 3 m yang mencakup seluruh DAS</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: The user journey / trace -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Telusuri apa yang terjadi saat Anda menjalankannya</h2>
+        <p>Bayangkan Anda membuka terminal dan mengetik <code style="background:var(--color-bg-code);color:#A6E3A1;padding:2px 8px;border-radius:4px">python planetscope_10epoch_obia_v3.py</code>. Inilah perjalanan tepat yang ditempuh data Anda — dari piksel satelit mentah hingga peta hutan berwarna di layar.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"flow-actor-1","label":"Tahap 0: Skrip membaca 10 citra GeoTIFF PlanetScope dari disk — masing-masing 8 band spektral"},
+          {"highlight":"flow-actor-1","label":"Tahap 1: OTB LSMS mensegmentasi citra menjadi 316.000 petak homogen (seperti memotong mosaik menjadi ubin)","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"flow-actor-2","label":"Tahap 2-3: Untuk setiap segmen, dihitung 591 pengukuran — rata-rata spektral, hamburan radar, tinggi pohon...","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"flow-actor-3","label":"Tahap 5-6: Titik latih dari lapangan dicocokkan ke segmen. 70% menjadi guru, 30% menjadi ujian.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"flow-actor-4","label":"Tahap 7: Klasifikator Random Forest belajar dari 70% dan memprediksi kelas untuk semua 316 ribu segmen","packet":true,"from":"actor-4","to":"actor-5"},
+          {"highlight":"flow-actor-5","label":"Tahap 10-12: Kelas yang diprediksi dilukiskan ke kisi citra, menghasilkan peta 9 kelas final"}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon">🛰️</div>
+              <span>Citra Mentah</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon">✂️</div>
+              <span>Segmen</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon">📊</div>
+              <span>Fitur</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon">🌲</div>
+              <span>Model RF</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-5">
+              <div class="flow-actor-icon">🗺️</div>
+              <span>Peta Lahan</span>
+            </div>
+          </div>
+          <div class="flow-packet" id="flow-packet"></div>
+          <div class="flow-step-label" id="flow-label">Klik "Langkah Berikutnya" untuk menelusuri pipeline</div>
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Langkah Berikutnya</button>
+            <button class="btn flow-reset-btn">Mulai Ulang</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: The 9 classes -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Sembilan jawaban yang dapat diberikan peta</h2>
+        <p>Pipeline ini menggunakan <strong>hierarki dua tingkat</strong>. Tingkat 1 mengelompokkan lahan ke dalam 7 kategori besar. Tingkat 2 memperbesar "Vegetasi Lebat" dan membaginya menjadi tiga subtipe hutan.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#2A7B9B">💧</div>
+            <div><strong>1 — Badan Air</strong><p>Danau, sungai, waduk Cisokan — setiap permukaan air terbuka</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#D4A843">🌾</div>
+            <div><strong>2 — Sawah</strong><p>Lahan padi irigasi — perubahan NDVI yang kuat antara masa tanam dan panen</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#9E9790">🏠</div>
+            <div><strong>3 — Lahan Terbangun</strong><p>Jalan, atap, permukiman — kecerahan tinggi di semua musim</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#6B6560">🌫️</div>
+            <div><strong>4 — Lainnya</strong><p>Awan, bayangan, piksel campuran — apa pun yang tidak masuk ke label lain</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#1a5c35">🌳</div>
+            <div><strong>5 — Hutan Alam</strong><p>Hutan primer dan sekunder — kanopi tertinggi, biomassa terbesar</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#2D8B55">🌲</div>
+            <div><strong>6 — Hutan Produksi</strong><p>Perkebunan kayu — lebat namun lebih muda, kanopi lebih seragam</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#5AAD7A">🫖</div>
+            <div><strong>7 — Agroforest</strong><p>Kebun campuran (kopi, karet, buah-buahan) — heterogen dan sulit diklasifikasikan</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#D4A843">🌿</div>
+            <div><strong>8 — Vegetasi Jarang</strong><p>Padang rumput, semak, lahan terdegradasi — mencakup 46% DAS</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#E06B56">🌽</div>
+            <div><strong>9 — Lahan Pertanian</strong><p>Pertanian lahan kering — jagung, singkong, tanaman semusim campuran</p></div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Mengapa "Lahan Terbuka" dihapus</strong>
+            <p>Cisokan memiliki sangat sedikit tanah yang benar-benar terbuka secara permanen — apa yang terlihat sebagai "Lahan Terbuka" sebagian besar merupakan kondisi sementara (sawah setelah panen, bera, bayangan awan). Memaksa model untuk mempelajari kelas yang tidak konsisten memperburuk segalanya. Menghapusnya meningkatkan akurasi keseluruhan dari 87% menjadi 89,5%.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: Key results up front -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Seberapa baik hasilnya?</h2>
+        <p>Sebelum menyelami mekanismenya, inilah intinya: pipeline ini mencapai <strong>akurasi keseluruhan 89,5%</strong> untuk peta L1 7 kelas — diverifikasi pada 228 segmen yang tidak pernah dilihat model selama pelatihan.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">🎯</div>
+            <h4 class="pattern-title">Akurasi L1</h4>
+            <p class="pattern-desc">89,5% akurasi keseluruhan, 92% dalam validasi silang 5-lipatan. Setiap kelas mencapai F1 ≥ 0,82.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🌲</div>
+            <h4 class="pattern-title">Akurasi L2</h4>
+            <p class="pattern-desc">57,5% untuk subtipe hutan — masalah lebih sulit, hanya 137 sampel latih. Hutan produksi adalah kelas yang paling sulit.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📈</div>
+            <h4 class="pattern-title">Faktor kunci</h4>
+            <p class="pattern-desc">Data ketinggian kanopi (fitur terpenting #1 dan #3) — tinggi pohon memisahkan hutan dari lahan pertanian lebih baik daripada band spektral mana pun.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🗺️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Apa yang akan Anda pelajari dalam kursus ini</strong>
+            <p>Modul 2 memperkenalkan 12 skrip. Modul 3 menguraikan bagaimana piksel mentah menjadi 591 pengukuran. Modul 4 menjelaskan segmentasi dan Random Forest. Modul 5 menunjukkan cara membaca angka akurasi dan cara meningkatkan model.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

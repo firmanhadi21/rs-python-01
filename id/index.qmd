@@ -1,0 +1,72 @@
+# Kata Pengantar {.unnumbered}
+
+Buku ini mendokumentasikan pipeline klasifikasi tutupan lahan dari awal hingga akhir yang dibangun untuk **DAS Cisokan**, Jawa Barat, Indonesia. Pipeline ini menggabungkan citra satelit PlanetScope multi-temporal dengan SAR C-band Sentinel-1, PALSAR-2 L-band, dan data tinggi kanopi resolusi tinggi untuk menghasilkan peta tutupan lahan hierarkis 9 kelas pada resolusi 3 m.
+
+## Apa yang dilakukan pipeline ini
+
+Pipeline ini menggunakan **Object-Based Image Analysis (OBIA)**: alih-alih mengklasifikasikan piksel secara individual, pertama-tama piksel-piksel yang berdekatan dikelompokkan menjadi segmen-segmen yang homogen secara spasial (objek), kemudian model klasifikasi Random Forest dilatih menggunakan fitur-fitur pada tingkat segmen. Pendekatan ini menghindari noise salt-and-pepper yang umum pada klasifikasi berbasis piksel dan menghasilkan keluaran yang bersih seperti poligon, yang terbaca secara alami di QGIS.
+
+Klasifikasi bersifat **hierarkis** — dua model Random Forest yang disusun secara berurutan:
+
+- **L1** mengklasifikasikan semua segmen ke dalam 7 jenis tutupan lahan, termasuk kelas "Vegetasi Lebat" yang bersifat umum.
+- **L2** mengklasifikasikan ulang segmen Vegetasi Lebat menjadi 3 subtipe hutan: Hutan Alam, Hutan Produksi, dan Agroforest.
+
+```
+PlanetScope (10 epoch, 3 m)    ─┐
+Sentinel-1 SAR (30 m)           ├─► 591 fitur per segmen ─► L1 Random Forest (7 kelas)
+PALSAR-2 (30 m)                 │                                      │
+Canopy height (ETH + Meta)     ─┘                              Segmen Vegetasi Lebat saja
+                                                                        │
+                                                               L2 Random Forest (3 subtipe)
+                                                                        │
+                                                               Peta akhir 9 kelas
+```
+
+## Hasil utama
+
+Diverifikasi pada 2026-05-03 dengan 316.209 segmen LSMS halus:
+
+| Level | Holdout OA | Kappa | 5-fold CV OA |
+|-------|-----------|-------|--------------|
+| L1 (7 kelas, Bareland dihapus) | **89,5%** | 0,875 | 92,0% ± 1,6% |
+| L2 (3 subtipe hutan) | 57,5% | 0,324 | 64,9% ± 7,6% |
+
+Model L1 bersifat robust. Model L2 dibatasi oleh jumlah sampel — khususnya Hutan Produksi yang tertukar dengan Hutan Alam. Menambahkan 30–50 lokasi Hutan Produksi yang tidak ambigu adalah langkah selanjutnya yang paling bernilai.
+
+## Skema kelas akhir
+
+| ID | Kelas | Sumber |
+|----|-------|--------|
+| 1 | Waterbody | L1 |
+| 2 | Paddy | L1 |
+| 3 | Built-up | L1 |
+| 4 | Others | L1 |
+| 5 | Natural Forest | L2 dalam Vegetasi Lebat |
+| 6 | Production Forest | L2 dalam Vegetasi Lebat |
+| 7 | Agroforest | L2 dalam Vegetasi Lebat |
+| 8 | Sparse Vegetation | L1 |
+| 9 | Crops | L1 |
+
+## Distribusi piksel AOI (run 2026-05-03)
+
+| Kelas | % AOI |
+|-------|-------|
+| Waterbody | 0,3% |
+| Paddy | 14,3% |
+| Built-up | 7,7% |
+| Others | 1,2% |
+| Natural Forest | 15,1% |
+| Production Forest | 7,2% |
+| Agroforest | 3,0% |
+| Sparse Vegetation | 45,9% |
+| Crops | 5,3% |
+
+## Perangkat lunak
+
+| Komponen | Versi |
+|----------|-------|
+| Python | 3.14.4 (Homebrew) |
+| OTB (segmentasi) | 8.1.2 |
+| scikit-learn | terbaru |
+| rasterio | ≥ 1.5 |
+| Earth Engine API | terbaru |

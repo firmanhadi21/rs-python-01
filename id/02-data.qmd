@@ -1,0 +1,132 @@
+# Sumber Data
+
+## PlanetScope SuperDove
+
+Sumber citra utama adalah PlanetScope SuperDove pada resolusi 3 m. Sepuluh epoch yang mencakup dua tahun melingkupi siklus musiman penuh Jawa Barat: dua komposit musim kemarau dan dua komposit musim hujan per tahun, ditambah tanggal-tanggal masa transisi.
+
+| Label | Tanggal | DOY | Musim |
+|-------|---------|-----|-------|
+| `march` | 21 Mar 2024 | 81 | Akhir hujan |
+| `june` | 30 Jun 2024 | 182 | Awal kemarau |
+| `aug` | 5 Agu 2024 | 218 | Kemarau |
+| `sept` | 16 Sep 2024 | 260 | Kemarau |
+| `jan25` | 10 Jan 2025 | 10 | Hujan |
+| `may25` | 5 Mei 2025 | 125 | Awal kemarau |
+| `aug25` | 15 Agu 2025 | 227 | Kemarau |
+| `sep25` | 7 Sep 2025 | 250 | Kemarau |
+| `nov25` | 24 Nov 2025 | 328 | Awal hujan |
+| `mar26` | 17 Mar 2026 | 76 | Akhir hujan |
+
+SuperDove menyediakan 8 pita spektral:
+
+| Pita | Nama |
+|------|------|
+| 1 | Coastal Blue |
+| 2 | Blue |
+| 3 | Green I |
+| 4 | Green |
+| 5 | Yellow |
+| 6 | Red |
+| 7 | Red Edge |
+| 8 | NIR |
+
+Red edge (pita 7) merupakan tambahan kunci dibandingkan sensor PlanetScope yang lebih lama — pita ini memungkinkan indeks vegetasi seperti NDRE dan CIre yang lebih sensitif terhadap kandungan klorofil kanopi dibandingkan NDVI saja.
+
+## Sentinel-1 SAR
+
+Citra Sentinel-1 GRD dari ESA Copernicus, diakses melalui Earth Engine:
+
+- **Koleksi:** `COPERNICUS/S1_GRD`
+- **Mode:** Interferometric Wide (IW), orbit menurun
+- **Polarisasi:** VV dan VH
+- **Rentang waktu:** 2024-03-01 hingga 2026-03-31 (melingkupi tumpukan PlanetScope)
+- **Skala:** diekspor pada 30 m
+
+Citra mentah berada dalam satuan sigma0 linear. Nilai non-positif (umum untuk VH pada kanopi lebat dan perairan) dijepit ke 1e-10 sebelum konversi log10 agar semua piksel yang diekspor bersifat hingga:
+
+```python
+img.max(1e-10).log10().multiply(10)
+```
+
+Tanpa penjepitan ini, reducer `mean()` di EE akan menyebarkan masker nodata dan GeoTIFF yang diekspor bisa hampir seluruhnya kosong (diamati: 0,2% piksel VH yang hingga sebelum perbaikan).
+
+### Pita fitur S1 (total 19)
+
+| Pita | Deskripsi |
+|------|-----------|
+| `VV_mean`, `VH_mean` | Rata-rata temporal (dB) |
+| `VV_stdDev`, `VH_stdDev` | Standar deviasi temporal |
+| `VV_min`, `VH_min` | Minimum temporal |
+| `VV_max`, `VH_max` | Maksimum temporal |
+| `VV_CV`, `VH_CV` | Koefisien variasi |
+| `VV_wet`, `VH_wet` | Rata-rata musim hujan (Nov–Mar) |
+| `VV_dry`, `VH_dry` | Rata-rata musim kemarau (Apr–Okt) |
+| `VV_seasonal_diff`, `VH_seasonal_diff` | Hujan dikurangi kemarau |
+| `VV_VH_ratio` | VV − VH (dB) |
+| `RVI_S1` | Radar Vegetation Index |
+| `DPSVI_S1` | Dual-Polarization SAR Vegetation Index |
+
+## PALSAR-2
+
+Mosaik tahunan ALOS-2 PALSAR-2 L-band dari JAXA, diakses melalui Earth Engine:
+
+- **Aset:** `JAXA/ALOS/PALSAR/YEARLY/SAR`
+- **Pita:** HH dan HV (DN, uint16)
+- **Tahun:** otomatis dicoba 2024 → 2017; **2020** dipilih untuk AOI ini (tahun terbitan terbaru per 2026-05)
+- **Skala:** diekspor pada 30 m
+
+DN dikonversi ke sigma0 (dB): `20 × log10(DN) − 83`.
+
+### Pita fitur PALSAR (total 5)
+
+| Pita | Deskripsi |
+|------|-----------|
+| `HH_db` | Backscatter HH (dB) |
+| `HV_db` | Backscatter HV (dB) |
+| `HH_HV_ratio` | HH − HV (dB) |
+| `RVI_PALSAR` | Radar Vegetation Index |
+| `DPSVI_PALSAR` | Dual-Polarization SAR Vegetation Index |
+
+HV_db menempati peringkat ke-5 dalam kepentingan fitur keseluruhan — L-band menembus kanopi lebat dan membawa informasi struktural (biomassa, tinggi kanopi) yang tidak dapat diselesaikan oleh C-band.
+
+## Tinggi kanopi
+
+### ETH 2020 (10 m)
+
+Tinggi kanopi global dari [Lang et al. 2022](https://www.nature.com/articles/s41559-022-01810-1), didistribusikan melalui Earth Engine (`users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1`). Menyediakan `tree_height_mean` dan `tree_height_std` dalam jendela fokal 30 m — dua fitur dalam cache piksel.
+
+### Meta Data-for-Good v2 (~28 m sumber, keluaran 3 m)
+
+Statistik kanopi yang diagregasi pada level lebih tinggi dari program Data-for-Good Meta, diakses secara anonim dari S3 (`dataforgood-fb-data`). Diunduh oleh `download_meta_canopy_v2.py` dan diproyeksikan ulang ke EPSG:32748 pada 3 m.
+
+| Statistik | Satuan | Deskripsi |
+|-----------|--------|-----------|
+| `avg` | meter | Rata-rata tinggi kanopi |
+| `stdev` | meter | Standar deviasi tinggi |
+| `p95` | meter | Tinggi persentil ke-95 (pohon emergent) |
+| `cover` | fraksi | Fraksi penutupan kanopi |
+
+Keempat layer ini → 8 fitur segmen (rata-rata + std masing-masing). Layer-layer ini menempati **kepentingan fitur tertinggi per fitur** dalam tumpukan 599 fitur penuh — mengalahkan setiap fitur spektral, temporal, dan SAR secara individual. `meta_canopy_p95__mean` dan `meta_canopy_avg__mean` adalah dua fitur teratas secara keseluruhan.
+
+**Pengkodean sumber:** nilai uint16 mentah menggunakan sentimeter (untuk tinggi) dan per-seribu (untuk penutupan); 65535 adalah sentinel nodata. `download_meta_canopy_v2.py` melakukan masking dan penskalaan ulang ke satuan alami sebelum menyimpan.
+
+## Sampel pelatihan
+
+`samples.gpkg` berisi fitur titik yang didigitasi melalui foto-interpretasi atas citra PlanetScope dan diperiksa silang dengan QGIS Wayback:
+
+| Kolom | Nilai | Digunakan oleh |
+|-------|-------|----------------|
+| `class` | 1–7 (integer) | Klasifikasi L1 |
+| `class_l2` | `Natural`, `Production`, `Agroforest` (string) | Klasifikasi L2 |
+
+Titik-titik dengan `class = 5` (Vegetasi Lebat) dan `class_l2` yang tidak null berfungsi ganda: melatih L1 sebagai Vegetasi Lebat sekaligus melatih L2 untuk pemisahan subtipe hutan.
+
+### Target sampel L2
+
+Targetkan ≥30 poligon yang dapat diinterpretasi secara foto per subkelas L2. Petunjuk interpretatif:
+
+| Subtipe | Tinggi kanopi | Stdev tinggi | Petunjuk lain |
+|---------|--------------|--------------|---------------|
+| Natural Forest | >20 m, emergent tidak merata | Tinggi | Tekstur mahkota tidak beraturan, tidak berjajar, di lereng |
+| Production Forest | 15–25 m, seragam | **Rendah** | Blok persegi panjang, jalan terlihat, sesekali ada lahan tebang dalam deret waktu |
+| Agroforest | 8–18 m, campuran | Sedang | Dekat permukiman, variasi NDVI lebih banyak antar epoch |

@@ -1,0 +1,102 @@
+# Pengaturan & Instalasi
+
+## Lingkungan Python
+
+Pipeline ini memerlukan Python 3.14 dan OTB 8.1.2. Pada macOS arm64, `rasterio` dan `pyogrio` menyertakan GDAL yang sudah terbundel dalam wheel-nya — tidak diperlukan `brew install gdal`.
+
+```bash
+# Buat virtual environment
+/opt/homebrew/bin/python3.14 -m venv .venv
+
+# Instal dependensi
+.venv/bin/pip install --upgrade pip wheel
+.venv/bin/pip install -r requirements.txt
+```
+
+### Dependensi SAM (opsional)
+
+Skrip segmentasi SAM (`sam_run.py`) memerlukan `torch` dan `samgeo`. Instal secara terpisah karena build `torch` yang tepat bergantung pada platform Anda:
+
+```bash
+# Apple Silicon (MPS)
+.venv/bin/pip install torch torchvision
+.venv/bin/pip install samgeo
+
+# Linux dengan CUDA
+.venv/bin/pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+.venv/bin/pip install samgeo
+```
+
+## OTB (Orfeo Toolbox)
+
+OTB diperlukan untuk tahap segmentasi LSMS. Unduh binary macOS dari [halaman rilis OTB](https://www.orfeo-toolbox.org/download/) dan ekstrak ke `~/OTB-8.1.2-Darwin64`.
+
+Pipeline mengharapkan OTB berada di `~/OTB-8.1.2-Darwin64` secara default. Ubah dengan mengatur `cfg.otb_home` pada `Config` jika instalasi Anda berada di lokasi yang berbeda.
+
+## Kredensial Earth Engine
+
+`ee_init.py` melakukan autentikasi melalui akun layanan GEE. Skrip ini membaca tiga variabel lingkungan, dan akan kembali ke nilai default bawaan untuk mesin ini jika variabel-variabel tersebut tidak diatur:
+
+| Variabel | Default |
+|----------|---------|
+| `GEE_PROJECT_ID` | `ee-geodeticengineeringundip` |
+| `GEE_SERVICE_ACCOUNT_EMAIL` | `sci-eudr@ee-geodeticengineeringundip.iam.gserviceaccount.com` |
+| `GEE_SERVICE_ACCOUNT_KEY_FILE` | `~/Github/forest-analyzer/config/ee-geodetic.json` |
+
+Untuk mengganti pada mesin yang berbeda, ekspor variabel-variabel tersebut sebelum menjalankan skrip apa pun:
+
+```bash
+export GEE_PROJECT_ID=your-project-id
+export GEE_SERVICE_ACCOUNT_EMAIL=your-sa@your-project.iam.gserviceaccount.com
+export GEE_SERVICE_ACCOUNT_KEY_FILE=~/path/to/key.json
+```
+
+Atau gunakan file `csk.env` yang disediakan:
+
+```bash
+set -a; source csk.env; set +a
+```
+
+### Uji cepat
+
+```bash
+.venv/bin/python ee_init.py
+# Diharapkan: "EE round-trip on project ee-geodeticengineeringundip: 1 + 1 = 2"
+```
+
+## Tata letak direktori
+
+```
+CSK/
+  planetscope_10epoch_obia_v3.py    Klasifikasi OBIA utama
+  planetscope_10epoch_local.py      Pembangun cache fitur piksel (prasyarat)
+  build_sar_features.py             Pengunduh SAR dari Earth Engine
+  ee_init.py                        Helper autentikasi EE
+  download_meta_canopy_v2.py        Pengunduh tinggi kanopi Meta v2
+  curate_samples_for_obia.py        Alat kurasi sampel
+  separability_plot.py              Visualisasi separabilitas kelas
+  spectral_signature_plot.py        Visualisasi tanda tangan spektral
+  sam_preprocess.py                 Persiapan input SAM
+  sam_run.py                        Segmentasi SAR
+  sam_filter.py                     Filter poligon SAM
+  sam_option_a.py                   Opsi subdivisi SAM
+
+  samples.gpkg                      Titik pelatihan (label L1 + L2)
+  aoi_cisokan.gpkg                  Poligon AOI (UTM 48S / EPSG:32748)
+  canopy_height.tif                 Tinggi kanopi ETH 2020 (10 m)
+  rasters/                          10 epoch GeoTIFF PlanetScope
+    meta_v2/                        Layer tinggi kanopi Meta v2 (3 m)
+  S1_temporal_features.tif          Keluaran build_sar_features.py
+  PALSAR_features.tif               Keluaran build_sar_features.py
+
+  outputs_10epoch/                  Cache fitur piksel (planetscope_10epoch_local.py)
+    feature_cache/                  138 TIF fitur pita tunggal
+  outputs_10epoch_obia_v3/          Keluaran OBIA v3
+    feature_cache_v3/               Cache fitur yang diperluas (indeks baru + temporal)
+    lsms_labels.tif                 Raster label segmen
+    seg_composite.tif               Komposit 4-pita yang digunakan untuk segmentasi
+    PS_LandCover_OBIA_v3.tif        Raster klasifikasi L1
+    PS_LandCover_OBIA_v3_Final.tif  Raster akhir 9 kelas
+    summary.json                    Metrik utama
+    *.csv                           Matriks konfusi, F1 per kelas, kepentingan fitur
+```

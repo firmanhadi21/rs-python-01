@@ -1,0 +1,224 @@
+# Referensi Skrip
+
+## `planetscope_10epoch_obia_v3.py` — Classifier utama
+
+Pipeline OBIA end-to-end yang menjadi rujukan utama. Urutan eksekusi dan kesadaran cache:
+
+```bash
+# Pertama kali (semua cache kosong)
+.venv/bin/python -u planetscope_10epoch_obia_v3.py   # ~45–90 menit
+
+# Eksekusi hangat (segmentasi + fitur sudah di-cache)
+.venv/bin/python -u planetscope_10epoch_obia_v3.py   # ~5–8 menit
+
+# Setelah menambahkan sampel (tanpa perubahan fitur)
+.venv/bin/python -u planetscope_10epoch_obia_v3.py   # ~5–8 menit
+
+# Setelah perubahan rekayasa fitur
+rm -rf outputs_10epoch_obia_v3/feature_cache_v3
+.venv/bin/python -u planetscope_10epoch_obia_v3.py   # menghitung ulang fitur
+```
+
+### Kolom `Config` utama
+
+| Kolom | Default | Deskripsi |
+|-------|---------|-----------|
+| `seg_spatialr` | 3 | Radius pencarian spasial LSMS |
+| `seg_ranger` | 12.0 | Rentang spektral LSMS |
+| `seg_minsize` | 50 | Ukuran segmen minimum LSMS |
+| `force_resegment` | `False` | Bangun ulang segmentasi dari awal |
+| `rf_trees` | 100 | Jumlah pohon Random Forest |
+| `train_fraction` | 0.7 | Pembagian holdout 70/30 |
+| `n_cv_folds` | 5 | Lipatan cross-validation |
+| `top_n_features` | 20 | Model subset Top-N |
+| `l2_enable` | `True` | Jalankan model subtipe hutan L2 |
+| `l2_method` | `"random_forest"` | `"polygon"` atau `"random_forest"` |
+| `haralick_enable` | `False` | Aktifkan tekstur Haralick GLCM |
+| `yrf_apply` | `False` | Terapkan aturan pasca-hoc YRF |
+| `ps_only` | `False` | Hilangkan SAR dan tinggi kanopi (ablasi) |
+| `epochs_subset` | `None` | Batasi ke satu epoch (ablasi) |
+
+### Keluaran
+
+Semua keluaran tersimpan di `outputs_10epoch_obia_v3/`:
+
+| Berkas | Deskripsi |
+|--------|-----------|
+| `PS_LandCover_OBIA_v3.tif` | Klasifikasi L1 (fitur lengkap) |
+| `PS_LandCover_OBIA_v3_Top20.tif` | Klasifikasi L1 (20 fitur teratas) |
+| `PS_LandCover_OBIA_v3_Final.tif` | Peta hierarkis final 9 kelas |
+| `summary.json` | Metrik utama |
+| `confusion_matrix_all.csv` | Matriks kebingungan holdout L1 |
+| `per_class_metrics_all.csv` | Presisi / recall / F1 per kelas |
+| `feature_importance_obia_v3.csv` | Kepentingan Gini untuk semua 591 fitur |
+| `feature_group_analysis_obia_v3.csv` | Total kepentingan per kelompok |
+| `temporal_group_analysis_obia_v3.csv` | Total kepentingan per epoch |
+| `cv_results_obia_v3_all_features.csv` | Detail CV 5-lipatan |
+| `class_distribution.csv` | Jumlah segmen pelatihan per kelas |
+| `final_class_distribution.csv` | Jumlah piksel kelas final di AOI |
+| `training_segments_labeled.csv` | Pemetaan segmen-ke-kelas yang digunakan untuk pelatihan |
+
+---
+
+## `planetscope_10epoch_local.py` — Pembangun cache fitur piksel
+
+**Harus dijalankan sebelum `planetscope_10epoch_obia_v3.py`** pada setup baru. Membaca 10 GeoTIFF PlanetScope, menghitung NDVI/NDWI/NDBI/EVI per epoch dan ringkasan temporal, lalu menulis 138 TIF fitur satu-pita ke `outputs_10epoch/feature_cache/`.
+
+```bash
+.venv/bin/python -u planetscope_10epoch_local.py
+```
+
+Juga melatih Random Forest tingkat piksel sendiri (lama) dan menulis klasifikasi raster penuh ke `outputs_10epoch/`. Keluaran ini tidak digunakan oleh pipeline OBIA v3 — hanya `feature_cache/` yang dikonsumsi.
+
+---
+
+## `build_sar_features.py` — Unduhan fitur SAR
+
+Mengunduh tumpukan fitur Sentinel-1 dan PALSAR-2 dari Earth Engine dan menulisnya sebagai GeoTIFF lokal.
+
+```bash
+# Default: kedua sensor pada 30 m (unduhan langsung)
+.venv/bin/python build_sar_features.py
+
+# Hanya Sentinel-1
+.venv/bin/python build_sar_features.py --skip-palsar
+
+# Hanya PALSAR
+.venv/bin/python build_sar_features.py --skip-s1
+
+# Resolusi penuh pada 10 m (melalui Google Drive)
+.venv/bin/python build_sar_features.py --scale 10
+```
+
+Pada 30 m, AOI Cisokan diunduh dalam satu permintaan (S1: 1.6 MB, PALSAR: 5.1 MB). Pada 10 m, tumpukan S1 melebihi batas unduhan langsung Earth Engine dan harus melalui Drive; unduh berkas hasil dari Drive dan ubah namanya menjadi `S1_temporal_features.tif`.
+
+---
+
+## `ee_init.py` — Autentikasi Earth Engine
+
+Menginisialisasi Earth Engine melalui akun layanan atau OAuth pengguna. Membaca `GEE_PROJECT_ID`, `GEE_SERVICE_ACCOUNT_EMAIL`, dan `GEE_SERVICE_ACCOUNT_KEY_FILE` dari lingkungan, dengan fallback ke nilai default yang dikodekan keras.
+
+```bash
+# Uji apakah kredensial berfungsi
+.venv/bin/python ee_init.py
+# Diharapkan: "EE round-trip on project ...: 1 + 1 = 2"
+```
+
+Diimpor oleh `build_sar_features.py`; tidak dipanggil langsung dalam produksi.
+
+---
+
+## `download_meta_canopy_v2.py` — Tinggi kanopi Meta
+
+Mengunduh empat statistik tinggi kanopi dari bucket S3 Data-for-Good Meta secara anonim (tidak memerlukan kredensial AWS). Melakukan streaming hanya jendela AOI melalui pembacaan parsial COG `/vsis3/`, kemudian memproyeksikan ulang ke EPSG:32748 pada resolusi 3 m.
+
+```bash
+.venv/bin/python download_meta_canopy_v2.py
+# Menulis: rasters/meta_v2/canopy_height_v2_{avg,stdev,p95,cover}.tif
+```
+
+Tile sumber bertipe uint16; skrip memasker sentinel nodata 65535 dan menerapkan skala yang tepat (÷100 untuk tinggi dalam meter, ÷1000 untuk penutupan sebagai fraksi) sebelum menulis.
+
+---
+
+## `curate_samples_for_obia.py` — Kurasi sampel
+
+Mereduksi `samples.gpkg` menjadi satu titik representatif per segmen LSMS dan mengidentifikasi titik-titik yang bertentangan (beberapa kelas dalam segmen yang sama).
+
+```bash
+# Langkah 1: hasilkan berkas yang dikurasi + konflik
+.venv/bin/python curate_samples_for_obia.py
+
+# Langkah 2: selesaikan konflik di QGIS
+# Buka conflicts.gpkg berdampingan dengan samples.gpkg dan segments.gpkg.
+# Hapus titik berkelas salah, simpan.
+
+# Langkah 3: gabungkan kembali konflik yang telah ditinjau
+# Setel REVIEWED_CONFLICTS = True dalam skrip, lalu jalankan ulang.
+.venv/bin/python curate_samples_for_obia.py
+```
+
+Menulis:
+
+- `samples_curated.gpkg` — satu titik per segmen bersih
+- `conflicts.gpkg` — semua titik dari segmen yang berkonflik (untuk tinjauan QGIS)
+- `curation_report.csv` — jumlah kelas sebelum dan sesudah kurasi
+
+---
+
+## `separability_plot.py` — Visualisasi keterpilahan kelas
+
+Menghasilkan gambar tiga panel dari CSV pelatihan 138 fitur lama:
+
+1. **Heatmap** — jarak keterpilahan mirip Fisher antar semua pasangan kelas.
+2. **Peringkat isolasi** — jarak rata-rata ke semua kelas lain (paling terisolasi → paling mudah diklasifikasi).
+3. **Graf pasangan kebingungan** — simpul pada lingkaran, tepi merah untuk pasangan paling sulit, hijau putus-putus untuk yang paling terpisah.
+
+```bash
+.venv/bin/python separability_plot.py
+# Menulis: outputs_10epoch/separability_overview.png dan .pdf
+```
+
+---
+
+## `spectral_signature_plot.py` — Visualisasi tanda tangan spektral
+
+Gambar dua panel di seluruh 138 fitur:
+
+1. **Panel atas** — reflektansi 8-pita mentah per epoch, ditumpuk untuk semua 10 epoch.
+2. **Panel bawah** — semua 138 fitur (rata-rata ± 1σ dengan bayangan) beserta pembatas kelompok (per epoch, ringkasan temporal, tinggi pohon).
+
+```bash
+.venv/bin/python spectral_signature_plot.py
+# Menulis: outputs_10epoch/spectral_signatures_138bands.png dan .pdf
+```
+
+---
+
+## Skrip segmentasi SAM
+
+Segmenter alternatif menggunakan Segment Anything Model (ViT-B) dari Meta. Menghasilkan batas poligon yang lebih halus dan peka tepi yang dapat digunakan untuk membagi mask L1=Dense Vegetation untuk interpretasi foto L2.
+
+### Alur kerja
+
+```bash
+# 1. Siapkan input RGB dan mask Dense
+.venv/bin/python sam_preprocess.py
+# Menulis: rasters/sam_input_aoi_rgb.tif
+#          rasters/sam_input_wz_dense_mask.tif
+
+# 2. Jalankan SAM (mengunduh checkpoint ViT-B ~360 MB pada eksekusi pertama)
+.venv/bin/python sam_run.py
+# Menulis: rasters/sam_output/sam_segments.tif
+#          rasters/sam_output/sam_segments.gpkg
+
+# 3a. Filter + isi residual
+.venv/bin/python sam_filter.py
+# Menulis: outputs_10epoch_obia_v3/sam_l2_candidates.gpkg
+
+# 3b. (Alternatif) bagi komponen Dense dengan garis potong SAM
+.venv/bin/python sam_option_a.py
+```
+
+### `sam_preprocess.py`
+
+Membaca `World Imagery_9862E977172.tif` (ESRI World Imagery, UInt32 4-pita EPSG:3857), memotong ke selubung WZ, melemparkan pita 1–3 ke uint8, memproyeksikan ulang ke EPSG:32748. Juga membangun mask biner L1=Dense dari `PS_LandCover_OBIA_v3.tif`.
+
+Memberi SAM RGB alami yang tidak dimasker (tidak dinolkan di luar Dense) — menolkan piksel non-Dense menciptakan wilayah hitam seragam yang besar sehingga SAM terlalu banyak memotong sebagai satu objek tunggal.
+
+### `sam_run.py`
+
+Menjalankan `SamGeo` (ViT-B) pada COG RGB yang telah diproses. Ukuran tile 1024×1024 piksel, tumpang tindih 256 piksel. Pada Apple Silicon MPS proses ini memakan waktu ~15–30 menit untuk citra WZ-clipped berukuran 1 Gpiksel.
+
+### `sam_filter.py`
+
+Memfilter keluaran SAM mentah:
+
+1. Hapus poligon < 0.05 ha (kebisingan).
+2. Potong setiap poligon ke mask L1=Dense.
+3. Hapus poligon yang sudah dipotong dan masih < 0.05 ha.
+4. Isi piksel Dense yang tidak tercakup oleh poligon SAM mana pun sebagai segmen "residual".
+
+### `sam_option_a.py`
+
+Pendekatan alternatif: vektorisasi mask L1=Dense sebagai komponen terhubung, lalu gunakan batas poligon SAM sebagai garis potong untuk membagi setiap komponen. Menghasilkan poligon yang persis sesuai dengan jejak L1=Dense.

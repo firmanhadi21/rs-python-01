@@ -1,0 +1,169 @@
+# Hasil
+
+## Perbandingan segmentasi
+
+Memperketat parameter LSMS dari pengaturan kasar ke pengaturan halus meningkatkan jumlah segmen sekitar lima kali lipat dan memberikan dampak positif yang signifikan terhadap akurasi:
+
+| Metrik | Kasar (60k segmen) | Halus (316k segmen) | Perubahan |
+|--------|:-----------------:|:-------------------:|:---------:|
+| piksel / segmen | 485 | 93 | −5× |
+| Baris pelatihan | 373 | 762 | +104% |
+| OA holdout | 0.852 | 0.873 | +2.1pp |
+| Kappa holdout | 0.825 | 0.851 | +2.6pp |
+| CV OA | 0.810 ± 0.049 | **0.887 ± 0.017** | +7.7pp, stdev ÷3 |
+| CV kappa | 0.775 ± 0.059 | **0.867 ± 0.020** | +9.2pp |
+| CV OA Top-20 | 0.748 ± 0.046 | 0.887 ± 0.020 | +13.9pp |
+
+Dua efek saling memperkuat: segmen yang lebih halus lebih sesuai dengan batas dunia nyata (satu segmen kasar tidak lagi mencakup sekaligus hutan dan lahan terbuka), dan lebih banyak titik sampel yang jatuh pada segmen unik daripada dipadatkan melalui pemungutan suara mayoritas — secara efektif menggandakan set pelatihan.
+
+Penurunan simpangan baku CV dari ±4.9pp menjadi ±1.7pp sangat berarti: model halus jauh **lebih stabil di seluruh lipatan**.
+
+## Akurasi L1 (skema lama 8 kelas, 2026-05-02)
+
+```json
+{
+  "n_segments":       316209,
+  "n_training_rows":     762,
+  "n_features_total":    591,
+  "all_features": {
+    "holdout_accuracy": 0.873,
+    "holdout_kappa":    0.851,
+    "cv_accuracy_mean": 0.887,
+    "cv_accuracy_std":  0.017,
+    "cv_kappa_mean":    0.867
+  },
+  "top_20": {
+    "holdout_accuracy": 0.873,
+    "holdout_kappa":    0.852,
+    "cv_accuracy_mean": 0.887,
+    "cv_kappa_mean":    0.867
+  }
+}
+```
+
+Performa Top-20 setara dengan fitur lengkap — konsisten dengan saturasi model begitu segmen sudah homogen.
+
+## Akurasi L1 (skema hierarkis 7 kelas, 2026-05-03)
+
+Menghapus kelas Lahan Gundul meningkatkan semua metrik:
+
+| Metrik | 8 kelas | 7 kelas | Perubahan |
+|--------|--------:|--------:|----------:|
+| OA holdout | 0.873 | **0.895** | +2.2pp |
+| Kappa holdout | 0.851 | **0.875** | +0.024 |
+| CV OA | 0.887 ± 0.017 | **0.920 ± 0.016** | +3.3pp |
+| CV kappa | 0.867 ± 0.020 | **0.905 ± 0.019** | +0.038 |
+| Holdout Top-20 | 0.873 | **0.928** | +5.5pp |
+
+### F1 per kelas (228 segmen validasi)
+
+| Kelas | F1 | Catatan |
+|-------|----|---------|
+| Waterbody | 0.93 | |
+| Paddy | 0.89 | |
+| Built-up | 0.90 | |
+| Others | 0.97 | |
+| Dense Vegetation | 0.83 | Dibagi menjadi subtipe pada L2 |
+| Sparse Vegetation | 0.82 | +0.25 vs kasar 8 kelas |
+| Crops | 0.91 | +0.24 vs kasar 8 kelas |
+
+Setiap kelas mencapai F1 ≥ 0.82. Sparse Vegetation dan Crops — kelas yang sebelumnya sering tertukar — meningkat secara signifikan dengan segmen yang lebih halus.
+
+## 15 fitur teratas berdasarkan kepentingan RF
+
+Kepentingan Gini dijumlahkan di seluruh 591 fitur = 1:
+
+| Peringkat | Fitur | Kepentingan | Kelompok |
+|-----------|-------|-------------|---------|
+| 1 | `tree_height_mean__mean` | 0.0192 | Tree_Height |
+| 2 | `ampNDBI__mean` | 0.0133 | Temporal_MinMaxStd |
+| 3 | `tree_height_std__mean` | 0.0128 | Tree_Height |
+| 4 | `ampNDVI__mean` | 0.0124 | Temporal_MinMaxStd |
+| 5 | **`PALSAR_HV_db__mean`** | **0.0121** | SAR_PALSAR |
+| 6 | `sept_NDBI__mean` | 0.0121 | NDBI_Indices |
+| 7 | `sept_NDWI__mean` | 0.0113 | NDWI_Indices |
+| 8 | `march_VARI__mean` | 0.0109 | VARI_Indices |
+| 9 | `sept_NDRE__mean` | 0.0100 | NDRE_Indices |
+| 10 | `harmOffsetNDVI__mean` | 0.0100 | Temporal_Harmonic |
+| 11 | `sept_OSAVI__mean` | 0.0099 | OSAVI_Indices |
+| 12 | `harmOffsetGNDVI__mean` | 0.0096 | Temporal_Harmonic |
+| 13 | `p50NDVI__mean` | 0.0093 | Temporal_Percentiles |
+| 14 | `sept_BSI__mean` | 0.0090 | BSI_Indices |
+| 15 | `jan25_VARI__mean` | 0.0089 | VARI_Indices |
+
+Tinggi kanopi mendominasi (peringkat #1 dan #3). PALSAR_HV berada di peringkat #5 — gelombang L menembus kanopi yang rapat dan membawa informasi biomassa yang tidak tersedia dalam data optis. September adalah tanggal tunggal paling informatif (musim kemarau; kontras maksimum antara tanah gundul, tanaman yang menguning, dan hutan hijau abadi).
+
+## Dampak tinggi kanopi Meta v2
+
+Menambahkan statistik tinggi kanopi Meta v2 (8 fitur) di atas fitur lama ETH:
+
+| Model | OA Holdout | Perubahan |
+|-------|-----------|-----------|
+| Tanpa Meta v2 | 0.895 | — |
+| Dengan Meta v2 | 0.899 | +0.4pp |
+
+Kenaikan pada L1 relatif kecil (mendekati saturasi). Kenaikan pada L2 lebih besar:
+
+| Metrik L2 | Tanpa | Dengan | Perubahan |
+|-----------|------:|-------:|----------:|
+| OA holdout | 0.575 | 0.625 | +5.0pp |
+| Kappa holdout | 0.324 | 0.399 | +7.5pp |
+| F1 Natural | 0.59 | 0.67 | +0.08 |
+| F1 Production | 0.50 | 0.58 | +0.08 |
+| F1 Agroforest | 0.62 | 0.62 | 0 |
+
+Fitur Meta v2 `meta_canopy_p95__mean` dan `meta_canopy_avg__mean` adalah fitur tunggal terpenting ke-1 dan ke-2 dalam tumpukan 599 fitur penuh saat Meta v2 disertakan — mengalahkan setiap fitur spektral, temporal, dan SAR.
+
+## Hasil subtipe hutan L2 (2026-05-03, 137 sampel)
+
+| Metrik | Nilai |
+|--------|-------|
+| Baris pelatihan (setelah imputasi) | 137 |
+| Latih / validasi | 97 / 40 |
+| OA holdout | 0.575 |
+| Kappa holdout | 0.324 |
+| CV OA | 0.649 ± 0.076 |
+| CV kappa | 0.432 ± 0.122 |
+
+### Matriks kebingungan (set validasi, 40 segmen)
+
+| | Prediksi Natural | Prediksi Production | Prediksi Agroforest |
+|-|:----------------:|:-------------------:|:-------------------:|
+| Aktual Natural (n=18) | 11 | 5 | 2 |
+| Aktual Production (n=14) | **7** | 7 | 0 |
+| Aktual Agroforest (n=8) | 1 | 2 | 5 |
+
+F1 per kelas: Natural 0.59, **Production 0.50**, Agroforest 0.67.
+
+Modus kegagalan yang dominan adalah Production yang diklasifikasikan sebagai Natural (7/14). Kedua subtipe memiliki kanopi yang tinggi dan rapat; fitur struktural yang seharusnya memisahkan keduanya (`tree_height_std`, `S1_VV_stdDev`, `PALSAR_HV_db`) sudah ada dalam model, namun 48 baris pelatihan Production terlalu sedikit untuk mempelajari pola siklus pengelolaan secara andal. Menambahkan 30–50 tegakan Production yang dapat diidentifikasi dengan jelas (baris penanaman terlihat di Wayback) adalah tindakan utama yang direkomendasikan.
+
+## Mengapa Lahan Gundul dihapus
+
+Lahan Gundul adalah kelas L1 yang paling lemah (F1 = 0.00 kasar, 0.36 halus). Penyebabnya bersifat struktural: **Cisokan memiliki sangat sedikit tanah yang secara permanen terbuka.** Label "Lahan Gundul" pada AOI ini menangkap kondisi sementara — sawah yang baru dipanen, lahan bera musim kemarau, artefak tepi — bukan tutupan lahan yang stabil. Memaksa classifier untuk mempelajari konsep Lahan Gundul yang koheren malah menyuntikkan kebisingan ke dalam kelas-kelas yang berdekatan (Sparse Vegetation dan Crops).
+
+Rekomendasi penugasan ulang titik sampel kelas-8 yang ada:
+
+| Konteks piksel | Tugaskan ulang ke |
+|----------------|-------------------|
+| Lahan bera / lahan pertanian yang baru dipanen | **9 Crops** |
+| Tepi sungai gundul, lereng terkikis, semak jarang | **8 Sparse Vegetation** |
+| Jalan, bangunan, tanah gundul antropogenik | **3 Built-up** |
+| Bayangan awan, artefak tepi, ambigu | **4 Others** |
+
+Triase cepat: jika NDVI rendah di seluruh 10 epoch → Sparse Veg atau Built-up. Jika NDVI berayun tinggi–rendah → Crops.
+
+## Distribusi piksel akhir (2026-05-03)
+
+| Kelas | % dari AOI |
+|-------|:----------:|
+| Waterbody | 0.3% |
+| Paddy | 14.3% |
+| Built-up | 7.7% |
+| Others | 1.2% |
+| Natural Forest | 15.1% |
+| Production Forest | 7.2% |
+| Agroforest | 3.0% |
+| Sparse Vegetation | 45.9% |
+| Crops | 5.3% |
+
+Sparse Vegetation sebesar 46% memerlukan overlay pemeriksaan kewarasan di QGIS. Sebagian patch tersebut mungkin merupakan pinggiran Agroforest. Jika demikian, solusinya adalah menambah lebih banyak sampel pelatihan Agroforest (saat ini paling sedikit dengan 30 sampel L2).

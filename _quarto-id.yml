@@ -1,0 +1,27 @@
+project:
+  type: book
+  output-dir: _book/id
+
+book:
+  title: "Klasifikasi Tutupan Lahan Cisokan"
+  subtitle: "Pipeline OBIA — PlanetScope, SAR & Tinggi Kanopi"
+  author: "Firman Hadi"
+  date: "2026"
+  repo-url: https://github.com/firmanhadi21/rs-python-01
+  repo-actions: [edit, issue]
+  chapters:
+    - id/index.qmd
+    - part: "Memulai"
+      chapters: [id/01-setup.qmd, id/02-data.qmd]
+    - part: "Pipeline"
+      chapters: [id/03-features.qmd, id/04-pipeline.qmd, id/05-results.qmd]
+    - part: "Referensi"
+      chapters: [id/06-scripts.qmd]
+
+format:
+  html:
+    theme: cosmo
+    code-copy: true
+    toc: true
+    toc-depth: 3
+    number-sections: true

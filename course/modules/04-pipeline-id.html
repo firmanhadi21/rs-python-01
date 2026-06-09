@@ -1,0 +1,190 @@
+<section class="module" id="module-4" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">04</span>
+      <h1 class="module-title">Mesin Pemikir</h1>
+      <p class="module-subtitle">Bagaimana segmentasi LSMS menggambar batas — dan bagaimana Random Forest belajar melabeli isinya</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- Screen 1: Segmentation explained -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Mengapa tidak mengklasifikasikan piksel per piksel saja?</h2>
+        <p>Pendekatan naif adalah: untuk masing-masing dari 300 juta piksel dalam citra Cisokan, tentukan kelasnya. Masalahnya? Satu piksel berukuran 3 m × 3 m — kira-kira seukuran mobil. Satu piksel "hutan" bisa saja berupa celah terkena sinar matahari, bayangan, atau ujung ranting. Derau mengalahkan sinyal.</p>
+        <p><span class="term" data-definition="OBIA singkatan dari Object-Based Image Analysis (Analisis Citra Berbasis Objek). Alih-alih mengklasifikasikan piksel individual, metode ini terlebih dahulu mengelompokkan piksel-piksel bertetangga menjadi objek yang koheren (segmen), lalu mengklasifikasikan setiap objek secara keseluruhan. Ini secara dramatis mengurangi derau dan memungkinkan fitur berbasis bentuk dihitung.">OBIA</span> memecahkan masalah ini dengan terlebih dahulu mengelompokkan piksel-piksel berdekatan yang serupa menjadi segmen — petak 50–500 piksel yang memiliki warna, tekstur, dan kecerahan yang mirip — kemudian mengklasifikasikan setiap petak sebagai satu unit.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-error)">
+            <div class="pattern-icon" style="background: var(--color-error)">❌</div>
+            <h4 class="pattern-title">Piksel per piksel (cara lama)</h4>
+            <p class="pattern-desc">300 juta keputusan. Setiap piksel hanya melihat satu kotak 3 m. Derau pada satu piksel gelap salah memberi label "bayangan" sebagai "air." Kesalahan salt-and-pepper di mana-mana.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">✅</div>
+            <h4 class="pattern-title">Segmen per segmen (OBIA)</h4>
+            <p class="pattern-desc">316.000 keputusan. Setiap segmen melihat 93 piksel yang dirata-ratakan. Derau saling meniadakan. Anda juga bisa menghitung bentuk (bulat vs. memanjang) — air berbentuk bulat, jalan berbentuk garis tipis.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: LSMS -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">LSMS: penyortir piksel</h2>
+        <p><span class="term" data-definition="LSMS singkatan dari Large-Scale Mean-Shift. Ini adalah algoritma dari Orfeo Toolbox (OTB) yang mengelompokkan piksel berdasarkan kemiripan — bukan hanya warna, tetapi juga kedekatan spasial. Bayangkan seperti membiarkan piksel &quot;bermigrasi&quot; menuju kerumunan terdekat yang serupa hingga semuanya berada dalam klaster.">LSMS</span> bekerja seperti algoritma penyortir kerumunan di sebuah festival. Setiap piksel "berjalan" menuju klaster tetangga berwarnatama serupa yang paling dekat. Setelah semua piksel menetap, kelompok-kelompok itu menjadi segmen.</p>
+        <p>Tiga parameter menentukan seberapa halus hasilnya:</p>
+
+        <div class="badge-list animate-in">
+          <div class="badge-item">
+            <code class="badge-code">spatialr = 3</code>
+            <span class="badge-desc">Radius pencarian dalam piksel — seberapa jauh sebuah piksel mencari tetangga yang serupa. Lebih kecil = segmen lebih halus.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">ranger = 12.0</code>
+            <span class="badge-desc">Toleransi spektral — seberapa berbeda dua piksel boleh tetap digabung. Lebih rendah = lebih banyak segmen.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">minsize = 50</code>
+            <span class="badge-desc">Ukuran segmen minimum dalam piksel. Serpihan kecil di bawah batas ini digabungkan ke segmen tetangga.</span>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📏</div>
+          <div class="callout-content">
+            <strong class="callout-title">Halus vs Kasar — perbedaan akurasi 7,7 poin persentase</strong>
+            <p>Eksperimen awal menggunakan parameter kasar (spatialr=15, ranger=30) yang menghasilkan 60.000 segmen dengan ~485 piksel per segmen. Penyempitan ke pengaturan halus saat ini melipattigakan jumlah segmen menjadi 316.000, mengurangi piksel per segmen menjadi 93, menggandakan set latih yang dapat digunakan, dan meningkatkan akurasi validasi silang dari 81% menjadi 88,7% — dengan standar deviasi yang menyusut dari ±4,9 poin persentase menjadi ±1,7 poin persentase (jauh lebih stabil).</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: The RF config (code translation) -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Random Forest — hutan yang mengklasifikasikan hutan</h2>
+        <p>Sebuah <span class="term" data-definition="Random Forest adalah ansambel pohon keputusan — seperti menanyakan pertanyaan yang sama kepada 100 pakar dan mengambil suara terbanyak. Setiap pohon melihat subset fitur dan contoh latih yang acak, sehingga suara gabungan jauh lebih andal daripada pohon tunggal mana pun.">Random Forest</span> bukanlah satu model melainkan ansambel 100 pohon keputusan, masing-masing dilatih secara independen pada subset data yang acak. Prediksi akhir adalah suara terbanyak dari 100 pohon tersebut.</p>
+        <p>Berikut adalah konfigurasi persis yang digunakan dalam pipeline ini:</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code>
+<span class="code-function">RandomForestClassifier</span>(
+  <span class="code-property">n_estimators</span>=<span class="code-number">100</span>,
+  <span class="code-property">min_samples_leaf</span>=<span class="code-number">1</span>,
+  <span class="code-property">max_samples</span>=<span class="code-number">0.5</span>,
+  <span class="code-property">bootstrap</span>=<span class="code-keyword">True</span>,
+  <span class="code-property">max_features</span>=<span class="code-string">"sqrt"</span>,
+  <span class="code-property">random_state</span>=<span class="code-number">42</span>,
+  <span class="code-property">n_jobs</span>=-<span class="code-number">1</span>,
+)
+            </code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Buat komite dari 100 pohon keputusan</p>
+              <p class="tl">Setiap simpul daun dapat mewakili satu contoh latih (tanpa penghalusan)</p>
+              <p class="tl">Setiap pohon hanya melihat 50% data latih — memaksa keberagaman</p>
+              <p class="tl">Pengambilan sampel dengan pengembalian (seperti mengambil kartu lalu mengembalikannya)</p>
+              <p class="tl">Setiap pohon melihat subset acak berukuran akar kuadrat dari 591 fitur</p>
+              <p class="tl">Keacakan tetap — jalankan dua kali, hasilnya sama</p>
+              <p class="tl">Gunakan semua inti CPU secara paralel — pelatihan lebih cepat</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: The L1→L2 hierarchy -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Dua pengklasifikasi, dua pertanyaan</h2>
+        <p>Pipeline menjalankan dua Random Forest secara berurutan. Bayangkan seperti wawancara dua babak: penyaring pertama mempersempit bidang, kemudian spesialis membuat keputusan akhir.</p>
+
+        <div class="flow-steps animate-in">
+          <div class="flow-step">
+            <div class="flow-step-num">L1</div>
+            <p>7 kelas luas — Badan Air, Sawah, Terbangun, Lainnya, Vegetasi Lebat, Vegetasi Jarang, Ladang</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <div class="flow-step-num">🌳</div>
+            <p>Semua segmen "Vegetasi Lebat" diserahkan ke L2</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <div class="flow-step-num">L2</div>
+            <p>3 subtipe hutan — Hutan Alam, Hutan Produksi, Agroforest</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <div class="flow-step-num">9</div>
+            <p>Peta akhir menggabungkan L1 + L2 menjadi raster hierarkis 9 kelas</p>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Bug pelabelan v2 yang menyebabkan penurunan akurasi 24 poin persentase</strong>
+            <p>Versi pipeline sebelumnya (v2) memperluas setiap titik latih menjadi baris berbobot dan menetapkan label fraksional per segmen. Ini menciptakan kontaminasi lintas-split — segmen yang sama muncul di split latih maupun validasi dengan label berbeda. Skema suara terbanyak v1 yang ketat (digunakan di v3) menghindari hal ini sepenuhnya. Pelajaran: selalu periksa split latih/validasi Anda untuk kebocoran data.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 5: Quiz -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Men-debug pengklasifikasi</h2>
+        <p>Anda telah menerapkan model. Seorang kolega melaporkan bahwa segmen Hutan Alam sering salah dilabeli sebagai Hutan Produksi. Terapkan apa yang telah Anda pelajari untuk mendiagnosis masalah ini.</p>
+
+        <div class="quiz-container" id="quiz-module4">
+          <div class="quiz-question-block"
+               data-correct="b"
+               data-explanation-right="Benar. Matriks kebingungan L2 dalam hasil menunjukkan bahwa 7 dari 14 segmen Hutan Produksi diklasifikasikan sebagai Hutan Alam. Kedua kelas memiliki kanopi yang tinggi dan lebat — fitur struktural (sebaran ketinggian kanopi, backscatter SAR) yang seharusnya memisahkan keduanya memang ada, tetapi terlalu sedikit baris latih Produksi agar model dapat belajar pola siklus pengelolaan dengan andal."
+               data-explanation-wrong="Belum tepat. Akurasi L1 untuk Vegetasi Lebat adalah F1 83%, yang dapat diterima. Kesalahan pelabelan antara Alam dan Produksi terjadi di dalam L2 — pengklasifikasi tahap kedua. Perhatikan kelas mana yang berada dalam cakupan L2.">
+            <h3 class="quiz-question">Hutan Alam dan Hutan Produksi sama-sama merupakan "Vegetasi Lebat" dalam model L1. Di mana kebingungan sebenarnya terjadi?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Di L1 — pengklasifikasi pertama membingungkan Vegetasi Lebat dengan kelas lain</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Di L2 — pengklasifikasi subtipe hutan tidak memiliki cukup sampel latih Produksi</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Di segmentasi — LSMS menggabungkan piksel Alam dan Produksi ke dalam segmen yang sama</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="c"
+               data-explanation-right="Tepat. Menambahkan 30–50 sampel latih Hutan Produksi yang tidak ambigu (cari barisan tanam di peta dasar satelit) adalah tindakan bernilai tertinggi. Model sudah memiliki fitur yang tepat — ia hanya belum melihat cukup contoh seperti apa Hutan Produksi itu."
+               data-explanation-wrong="Bukan jawaban terbaik. Menjalankan ulang segmentasi tidak akan membantu — pengklasifikasi L2 sudah mendapatkan semua segmen Vegetasi Lebat. Akar masalahnya adalah data latih yang tidak memadai, bukan segmentasi yang buruk.">
+            <h3 class="quiz-question">Apa tindakan bernilai tertinggi tunggal untuk meningkatkan klasifikasi Hutan Produksi?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Jalankan ulang segmentasi dengan parameter LSMS yang lebih halus untuk memisahkan petak hutan</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Tambahkan lebih banyak indeks spektral — model membutuhkan lebih banyak fitur untuk membedakan</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Kumpulkan 30–50 titik latih Hutan Produksi tambahan — barisan tanam terlihat di peta dasar satelit</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module4')">Periksa Jawaban</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module4')">Coba Lagi</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

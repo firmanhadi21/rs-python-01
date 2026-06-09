@@ -1,0 +1,145 @@
+# Rekayasa Fitur
+
+Pipeline ini merakit 591 fitur per segmen. Fitur terbagi dalam dua kategori: **fitur piksel** (dihitung pada tingkat raster, kemudian dirangkum per segmen sebagai mean + std) dan **fitur khusus-segmen** (dihitung langsung dari geometri segmen atau raster label).
+
+## Ringkasan fitur
+
+| Kelompok | Fitur | Tipe |
+|----------|-------|------|
+| Band spektral (8 band × 10 epoch) | 80 | Piksel |
+| Indeks lama (NDVI/NDWI/NDBI/EVI × 10 epoch) | 40 | Piksel |
+| Ringkasan temporal (max/min/std/amp × 4 indeks) | 16 | Piksel |
+| Tinggi pohon ETH (mean + std dalam 30 m) | 2 | Piksel |
+| Indeks per-epoch baru (10 indeks × 10 epoch) | 100 | Piksel |
+| Persentil temporal (p10/p50/p90 × 4 indeks) | 12 | Piksel |
+| Fit harmonik (amp/phase/offset × 4 indeks) | 12 | Piksel |
+| Delta tahun-ke-tahun (Maret 2024 → Maret 2026 × 4 indeks) | 4 | Piksel |
+| Tekstur (entropy, range, CV, MAD dari NDVI/NIR) | 6 | Segmen |
+| Bentuk (area, perimeter, kompaktness, elongasi, fill) | 5 | Segmen |
+| Sentinel-1 SAR (19 band × mean + std) | 38 | Piksel |
+| PALSAR-2 (5 band × mean + std) | 10 | Piksel |
+| Meta v2 kanopi (4 statistik × mean + std) | 8 | Piksel |
+| **Total** | **591** | |
+
+## Cache piksel lama (138 fitur)
+
+Dibangun oleh `planetscope_10epoch_local.py`. Untuk setiap 10 epoch:
+
+- 8 band spektral mentah (`{epoch}_b1` … `{epoch}_b8`)
+- 4 indeks spektral: NDVI, NDWI, NDBI, EVI
+
+Ditambah statistik ringkasan temporal di seluruh 10 epoch (4 indeks × 4 statistik = 16 fitur):
+
+```
+max{index}, min{index}, std{index}, amp{index}
+```
+
+Dan 2 fitur tinggi kanopi ETH: `tree_height_mean`, `tree_height_std`.
+
+**Pemetaan band (lama):** skrip piksel lama memperlakukan `b2=Blue, b3=Green_I, b4=Red, b6=Red, b8=NIR`. Ekstensi v3 menggunakan pemetaan SuperDove lengkap hanya untuk indeks baru; fitur lama tidak diubah untuk menjaga reproduksibilitas.
+
+## Indeks per-epoch baru (100 fitur)
+
+Dihitung oleh `planetscope_10epoch_obia_v3.py` menggunakan set band SuperDove lengkap. 10 indeks baru per epoch × 10 epoch = 100 fitur:
+
+| Indeks | Formula | Sensitivitas |
+|--------|---------|--------------|
+| NDRE | (NIR − RedEdge) / (NIR + RedEdge) | Klorofil kanopi |
+| CIre | NIR / RedEdge − 1 | Indeks klorofil |
+| RENDVI | (RedEdge − Red) / (RedEdge + Red) | Deteksi stres awal |
+| SAVI | (NIR − Red)(1 + L) / (NIR + Red + L), L=0.5 | Disesuaikan tanah kosong |
+| OSAVI | (NIR − Red) / (NIR + Red + 0.16) | Kanopi terbuka |
+| MSAVI2 | 0.5 × (2NIR + 1 − √((2NIR+1)² − 8(NIR−Red))) | Efek tanah diminimalkan |
+| GNDVI | (NIR − Green) / (NIR + Green) | Kehijauan kanopi |
+| ARVI | (NIR − (2Red − Blue)) / (NIR + (2Red − Blue)) | Tahan atmosfer |
+| VARI | (Green − Red) / (Green + Red − Blue) | Tahan atmosfer tampak |
+| BSI | ((Yellow + Red) − (NIR + Blue)) / ((Yellow + Red) + (NIR + Blue)) | Tanah kosong (tanpa SWIR; Yellow menggantikan) |
+
+Hasil di-cache sebagai GeoTIFF satu band di `outputs_10epoch_obia_v3/feature_cache_v3/`. Jalankan pertama kali: ~45 detik/epoch. Jalankan berikutnya: cache langsung tersedia.
+
+## Fitur temporal (28 fitur)
+
+Diturunkan dari deret waktu 10 epoch untuk empat indeks terpilih: NDVI, EVI, NDRE, GNDVI.
+
+### Persentil (12 fitur)
+
+Per-piksel p10, p50, p90 di seluruh 10 epoch. Robust terhadap outlier akibat bayangan awan atau akuisisi yang hilang:
+
+```
+p10{index}, p50{index}, p90{index}
+```
+
+### Fit harmonik (12 fitur)
+
+Memasang model Fourier satu suku per piksel:
+
+```
+y = a0 + a1·cos(2π·DOY/365) + b1·sin(2π·DOY/365)
+```
+
+Tiga fitur turunan per indeks: amplitudo (`√(a1² + b1²)`), fase (`arctan2(b1, a1)`), dan offset (`a0`). Amplitudo menangkap besaran variasi kehijauan musiman; offset adalah tingkat kehijauan rata-rata.
+
+```
+harmAmp{index}, harmPhase{index}, harmOffset{index}
+```
+
+`harmOffsetNDVI` berada di peringkat #10 dan `ampNDVI` di peringkat #4 dalam daftar 15 fitur terpenting — menunjukkan bahwa struktur musiman lebih informatif dibanding observasi satu tanggal mana pun.
+
+### Delta tahun-ke-tahun (4 fitur)
+
+Selisih piksel-per-piksel Maret 2024 → Maret 2026 untuk setiap indeks terpilih. Menangkap perubahan tutupan lahan dan pergeseran fenologi selama jendela observasi dua tahun:
+
+```
+yoy{index}_mar26_mar24
+```
+
+## Fitur tekstur (6 tingkat segmen)
+
+Dihitung pada citra NDVI dan NIR median temporal (bukan per epoch, untuk menghindari dominasi oleh satu tanggal tertentu):
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| `entropyNDVI__seg` | Entropi Shannon dari histogram NDVI di dalam segmen |
+| `entropyNIR__seg` | Entropi Shannon dari histogram NIR di dalam segmen |
+| `rangeNDVI__seg` | Rentang p90 − p10 dari piksel NDVI di dalam segmen |
+| `rangeNIR__seg` | Rentang p90 − p10 dari piksel NIR di dalam segmen |
+| `cvNDVI__seg` | Koefisien variasi NDVI di dalam segmen |
+| `madNDVI__seg` | Deviasi absolut rata-rata NDVI di dalam segmen |
+
+Entropi dan rentang yang tinggi menunjukkan vegetasi heterogen (misalnya tepi agroforest), sedangkan nilai rendah menunjukkan kanopi seragam (misalnya sawah, air).
+
+### Catatan tentang tekstur Haralick GLCM
+
+Tekstur Haralick GLCM (OTB `otbcli_HaralickTextureExtraction`) diuji pada 2026-05-03 dan **dinonaktifkan**. Hipotesisnya adalah bahwa periodisitas baris tanam di hutan produksi akan muncul sebagai ASM/energi tinggi pada offset 1 piksel (~3 m). Dalam praktiknya, komposit median temporal memuluskan pola spasial tersebut, dan 32 fitur tambahan menurunkan L2 CV OA dari 0,65 menjadi 0,61 (kutukan dimensionalitas pada 97 baris pelatihan). Pengaktifan kembali dikontrol oleh `cfg.haralick_enable = True`.
+
+## Fitur bentuk (5 tingkat segmen)
+
+Diturunkan dari raster label segmen:
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| `area_m2__seg` | Luas segmen dalam meter persegi |
+| `perimeter_m__seg` | Panjang perimeter (penghitungan tepi 4-terhubung) |
+| `compactness__seg` | 4π × area / perimeter² |
+| `elongation__seg` | Rasio sumbu mayor / minor bounding box |
+| `fill_ratio__seg` | Area / area bounding box |
+
+## Statistik zonal
+
+Semua fitur piksel dirangkum per segmen melalui **mean dan deviasi standar zonal** — dua fitur segmen per fitur piksel. Deviasi standar menangkap variabilitas di dalam segmen (misalnya segmen heterogen dengan vegetasi campuran akan memiliki std tinggi di seluruh band spektral).
+
+Segmen dengan kurang dari 4 piksel dalam AOI ditandai sebagai serpihan batas dan dihapus dari pelatihan.
+
+### Imputasi median
+
+Beberapa epoch PlanetScope memiliki tepi kasar 1–2 piksel pada band tertentu (teramati: `sep25_b1`, `nov25_b1`). Alih-alih menghapus semua segmen yang menyentuh tepi ini, v3 melakukan imputasi median pada fitur yang mengandung NaN sebagian:
+
+```python
+non_sliver = ~seg_df[feature_cols].isna().all(axis=1)
+medians = seg_df.loc[non_sliver, feature_cols].median()
+seg_df.loc[non_sliver, feature_cols] = (
+    seg_df.loc[non_sliver, feature_cols].fillna(medians)
+)
+```
+
+Ini memulihkan 13 segmen berlabel pada jalankan 2026-05-03, termasuk 6 dari 6 sampel Hutan Produksi yang baru ditambahkan yang berada di tepi.

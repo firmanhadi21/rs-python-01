@@ -22,8 +22,11 @@ jobs:
 
       - uses: quarto-dev/quarto-actions/setup@v2
 
-      - name: Render Quarto book
+      - name: Render Quarto book (English)
         run: quarto render
+
+      - name: Render Quarto book (Indonesian)
+        run: quarto render --config _quarto-id.yml
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

@@ -1,0 +1,193 @@
+<section class="module" id="module-3" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">03</span>
+      <h1 class="module-title">591 Cara Melihat Pohon</h1>
+      <p class="module-subtitle">Bagaimana piksel satelit mentah menjadi tabel 591 kolom — satu baris per petak hutan</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- Screen 1: Why 591? -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Mengapa model membutuhkan 591 angka per petak?</h2>
+        <p>Satu piksel pada satu tanggal hanya memberi sedikit informasi. Sawah dan jalan tanah basah terlihat hampir identik di bulan Maret. Namun amati keduanya di 10 tanggal berbeda, ukur respons radarnya, periksa ketinggian vegetasinya — kini keduanya benar-benar berbeda.</p>
+        <p>Keahlian pipeline ini adalah mengubah setiap segmen 93 piksel menjadi "sidik jari" yang kaya — 591 angka yang mendeskripsikan segala sesuatu yang dapat diamati tentang petak tersebut dari luar angkasa.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">🌈</div>
+            <h4 class="pattern-title">138 Fitur Piksel Warisan</h4>
+            <p class="pattern-desc">8 band × 10 epoch = 80 rata-rata band mentah, ditambah NDVI, NDWI, NDBI, EVI per epoch dan ringkasan temporal. Dibangun oleh planetscope_10epoch_local.py.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">📐</div>
+            <h4 class="pattern-title">100 Indeks Epoch Baru</h4>
+            <p class="pattern-desc">10 indeks spektral (NDRE, EVI2, BSI, OSAVI, VARI, MNDWI, CIG, GNDVI, ARI, SIPI) di semua 10 tanggal. Lebih diskriminatif dibanding band mentah.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📡</div>
+            <h4 class="pattern-title">48 Fitur SAR</h4>
+            <p class="pattern-desc">19 band Sentinel-1 + 5 band PALSAR-2, masing-masing dengan rata-rata dan standar deviasi di seluruh segmen = 48 angka. Backscatter radar mengkodekan kekasaran kanopi dan kelembaban tanah.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">📏</div>
+            <h4 class="pattern-title">12 Fitur Ketinggian Kanopi</h4>
+            <p class="pattern-desc">Meta v2 (rata-rata, stdev, p95, penutupan) + ETH (mean, std) — 6 mentah × mean + std = 12. Fitur terpenting ke-1 dan ke-3 dalam seluruh model.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🔲</div>
+            <h4 class="pattern-title">11 Tekstur + Bentuk</h4>
+            <p class="pattern-desc">6 statistik tekstur dari NDVI/NIR (varians, kontras...) + 5 properti geometri (luas, kekompakan, elongasi...) per segmen.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: The zonal stats trick -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Trik statistik zona — dari piksel ke petak</h2>
+        <p>Bayangkan setiap segmen sebagai wilayah di peta. Anda ingin mendeskripsikan wilayah itu — bukan piksel per piksel, melainkan secara keseluruhan. Pipeline menggunakan teknik penghitungan cerdas yang disebut <strong>statistik zona</strong>.</p>
+        <p>Untuk masing-masing dari 316.000 segmen dan masing-masing dari ~266 fitur piksel, dihitung dua angka: <em>rata-rata</em> (nilai khas di dalam wilayah ini) dan <em>standar deviasi</em> (seberapa beragam nilainya). Ini menghasilkan 266 × 2 = 532 fitur zona.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code>
+<span class="code-line"><span class="code-property">count</span> = np.<span class="code-function">bincount</span>(lbl, minlength=n_seg+<span class="code-number">1</span>)</span>
+<span class="code-line"><span class="code-property">s</span>     = np.<span class="code-function">bincount</span>(lbl, weights=val, minlength=n_seg+<span class="code-number">1</span>)</span>
+<span class="code-line"><span class="code-property">sq</span>    = np.<span class="code-function">bincount</span>(lbl, weights=val*val, minlength=n_seg+<span class="code-number">1</span>)</span>
+<span class="code-line"><span class="code-property">mean</span>  = s / count</span>
+<span class="code-line"><span class="code-property">std</span>   = np.<span class="code-function">sqrt</span>(sq/count - mean**<span class="code-number">2</span>)</span>
+            </code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Hitung berapa piksel yang ada di setiap segmen (seperti sensus)</p>
+              <p class="tl">Jumlahkan semua nilai piksel di dalam setiap segmen</p>
+              <p class="tl">Jumlahkan semua nilai kuadrat (diperlukan untuk menghitung sebaran)</p>
+              <p class="tl">Bagi total dengan jumlah untuk mendapatkan nilai rata-rata per segmen</p>
+              <p class="tl">Hitung sebaran: seberapa jauh piksel individu menyimpang dari rata-rata</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Mengapa numpy.bincount dan bukan perulangan?</strong>
+            <p>Perulangan di 316.000 segmen × 266 fitur × 93 piksel akan memakan waktu berjam-jam. <span class="term" data-definition="numpy adalah pustaka Python untuk komputasi numerik yang cepat. Ia beroperasi pada seluruh larik sekaligus — bukan melakukan iterasi satu per satu — sehingga 100–1000 kali lebih cepat untuk kumpulan data besar.">numpy.bincount</span> melakukan pekerjaan yang sama dengan mengakumulasi ember histogram dalam satu lintasan atas larik piksel. Waktu eksekusi: ~4 menit vs berjam-jam.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: The spectral indices -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Mengapa menghitung indeks dan bukan sekadar menggunakan band mentah?</h2>
+        <p>Nilai reflektansi mentah sensitif terhadap pencahayaan, atmosfer, dan keanehan sensor. <span class="term" data-definition="Indeks spektral adalah rasio matematis dari dua atau lebih band spektral yang menonjolkan properti tertentu — seperti kehijauan vegetasi atau kandungan air. Rasio membatalkan banyak sumber derau yang memengaruhi band individual.">Indeks spektral</span> adalah rasio yang membatalkan banyak derau tersebut dan memperkuat sinyal yang Anda pedulikan.</p>
+
+        <div class="badge-list stagger-children animate-in">
+          <div class="badge-item">
+            <code class="badge-code">NDVI</code>
+            <span class="badge-desc">Indeks Vegetasi Perbedaan Ternormalisasi — seberapa hijau dan aktif secara fotosintesis. Indeks klasik.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">NDRE</code>
+            <span class="badge-desc">Versi Red-Edge dari NDVI — lebih sensitif terhadap klorofil kanopi, kurang jenuh di atas hutan lebat.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">NDWI / MNDWI</code>
+            <span class="badge-desc">Indeks air — tinggi di atas badan air, rendah di atas tanah kering. Kunci untuk memisahkan Sawah dari Ladang.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">BSI</code>
+            <span class="badge-desc">Indeks Tanah Terbuka — tinggi di atas tanah gundul, rendah di atas vegetasi. Berlawanan dengan NDVI.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">VARI</code>
+            <span class="badge-desc">Indeks Ketahanan Atmosfer Tampak — bekerja hanya dengan RGB, sangat baik untuk Ladang pada citra bulan Maret.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">OSAVI / EVI2</code>
+            <span class="badge-desc">Indeks vegetasi yang disesuaikan tanah — lebih baik dari NDVI di mana tanah terbuka terlihat melalui kanopi jarang.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: Temporal features -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Musiman adalah senjata rahasia</h2>
+        <p>Satu tanggal bisa ambigu — sawah yang baru dipanen dan lereng tandus terlihat identik di musim kemarau. Namun di 10 tanggal, sawah memiliki tanda tangan yang sangat khas: menghijau cepat (tanam), mencapai puncak, lalu menguning cepat (panen). Hutan tetap hijau sepanjang tahun.</p>
+        <p>Pipeline menghitung <strong>fitur ringkasan temporal</strong> yang menangkap ritme ini:</p>
+
+        <div class="step-cards stagger-children animate-in">
+          <div class="step-card">
+            <div class="step-num">P</div>
+            <div class="step-body">
+              <strong>Persentil (p10, p25, p50, p75, p90)</strong>
+              <p>Persentil ke-50 (median) NDVI menangkap kehijauan "khas" dengan mengabaikan tanggal ekstrem. Rentang antara p10 dan p90 menangkap fluktuasi musiman.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">H</div>
+            <div class="step-body">
+              <strong>Koefisien harmonik (amplitudo, offset, fase)</strong>
+              <p>Pasangkan gelombang sinusoidal pada NDVI lintas waktu. Amplitudo menunjukkan seberapa besar variasinya secara musiman. Fase menunjukkan kapan puncaknya. Bersama-sama, keduanya mengidentifikasi kalender tanam.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">Y</div>
+            <div class="step-body">
+              <strong>Perbedaan Tahun ke Tahun</strong>
+              <p>Bandingkan bulan yang sama di dua tahun berbeda. Hutan stabil menunjukkan perubahan hampir nol. Lahan yang dibuka menunjukkan penurunan NDVI mendadak. Ini mendeteksi gangguan.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🗓️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Mengapa September adalah tanggal tunggal terpenting</strong>
+            <p>Peringkat kepentingan fitur menunjukkan bahwa indeks September (NDBI, NDWI, NDRE, OSAVI, BSI) mendominasi daftar 15 teratas. September adalah musim kemarau — kontras maksimum antara tanah gundul, tanaman yang mengering, dan hutan hijau abadi. Waktu musiman sama pentingnya dengan rentang spektral.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 5: DnD matching -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Cocokkan fitur dengan apa yang dideteksinya</h2>
+        <p>Seret setiap kelompok fitur ke properti tutupan lahan yang paling baik dideteksinya.</p>
+
+        <div class="dnd-container" id="dnd-module3">
+          <div class="dnd-chips">
+            <div class="dnd-chip" draggable="true" data-answer="canopy">Canopy Height</div>
+            <div class="dnd-chip" draggable="true" data-answer="radar">PALSAR-2 HV</div>
+            <div class="dnd-chip" draggable="true" data-answer="ndwi">NDWI (water index)</div>
+            <div class="dnd-chip" draggable="true" data-answer="harmonic">Harmonic amplitude</div>
+          </div>
+          <div class="dnd-zones">
+            <div class="dnd-zone" data-correct="canopy">
+              <p class="dnd-zone-label">Memisahkan Hutan Alam yang tinggi dari semak rendah dan ladang</p>
+              <div class="dnd-zone-target">Letakkan di sini</div>
+            </div>
+            <div class="dnd-zone" data-correct="radar">
+              <p class="dnd-zone-label">Menembus kanopi hutan untuk mengukur volume kayu dan biomassa</p>
+              <div class="dnd-zone-target">Letakkan di sini</div>
+            </div>
+            <div class="dnd-zone" data-correct="ndwi">
+              <p class="dnd-zone-label">Membedakan badan air terbuka dan sawah tergenang dari lahan kering</p>
+              <div class="dnd-zone-target">Letakkan di sini</div>
+            </div>
+            <div class="dnd-zone" data-correct="harmonic">
+              <p class="dnd-zone-label">Mendeteksi kalender tanam musiman — seberapa besar NDVI berosilasi sepanjang tahun</p>
+              <div class="dnd-zone-target">Letakkan di sini</div>
+            </div>
+          </div>
+          <button class="btn" style="margin-top:1rem" onclick="checkDnD('dnd-module3')">Periksa Pasangan</button>
+          <button class="btn" style="margin-top:1rem;margin-left:.5rem" onclick="resetDnD('dnd-module3')">Atur Ulang</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

@@ -1,0 +1,222 @@
+# Tahap-Tahap Pipeline
+
+Skrip utama `planetscope_10epoch_obia_v3.py` menjalankan 13 tahap secara menyeluruh. Adanya cache berarti bahwa pada jalankan hangat (segmentasi dan TIF fitur sudah dibangun), total waktu berjalan sekitar 5–8 menit.
+
+## Menjalankan pipeline
+
+### Kasus umum (setelah mengedit sampel)
+
+```bash
+.venv/bin/python -u planetscope_10epoch_obia_v3.py
+```
+
+### Memperbarui fitur SAR
+
+```bash
+.venv/bin/python build_sar_features.py
+.venv/bin/python -u planetscope_10epoch_obia_v3.py
+```
+
+`build_sar_features.py` menerima beberapa flag:
+
+| Flag | Efek |
+|------|------|
+| `--scale 10` | SAR resolusi penuh pada 10 m melalui Google Drive (lebih lambat) |
+| `--via-drive` | Paksa ekspor Drive meskipun pada 30 m |
+| `--skip-s1` | Hanya perbarui PALSAR |
+| `--skip-palsar` | Hanya perbarui Sentinel-1 |
+
+### Pembangunan ulang bersih (setelah perubahan rekayasa fitur)
+
+```bash
+rm -rf outputs_10epoch_obia_v3/feature_cache_v3
+.venv/bin/python -u planetscope_10epoch_obia_v3.py
+```
+
+## Tahap 0 — Inventaris fitur piksel
+
+Mendaftar semua fitur piksel yang akan dihitung atau dibaca dari cache:
+
+- **138 fitur lama** dari `outputs_10epoch/feature_cache/` (dibangun oleh `planetscope_10epoch_local.py`)
+- **100 indeks per-epoch baru** (dihitung atau dibaca dari `feature_cache_v3/`)
+- **28 fitur temporal** (persentil, harmonik, YoY)
+- Opsional: fitur topografi (dilewati jika `dem.tif` tidak ada)
+- Opsional: fitur Haralick GLCM (dinonaktifkan secara default)
+
+## Tahap 1 — Segmentasi
+
+Segmentasi LSMS (Large-Scale Mean-Shift) melalui OTB. Masukannya adalah komposit median temporal 4-band (NDVI, NDWI, NDBI, EVI), yang diregangkan persentil ke 0–255.
+
+### Parameter (segmentasi halus v3)
+
+| Parameter | Nilai | Efek |
+|-----------|-------|------|
+| `spatialr` | 3 | Radius pencarian spasial (piksel) |
+| `ranger` | 12.0 | Rentang spektral (satuan intensitas) |
+| `minsize` | 50 | Ukuran segmen minimum (piksel) |
+
+Parameter ini menghasilkan **316.209 segmen** dengan rata-rata 93 piksel setiap segmen (dibandingkan 60.682 segmen / 485 px/seg untuk jalankan kasar sebelumnya). Segmen yang lebih halus menangkap batas dunia nyata dengan lebih baik dan menggandakan set pelatihan efektif karena lebih banyak titik sampel jatuh di segmen yang unik.
+
+### Penggunaan ulang segmentasi
+
+Pipeline menggunakan ulang `lsms_labels.tif` yang sudah ada jika ditemukan di `outputs_10epoch_obia_v3/` (atau direktori keluaran sebelumnya). Atur `cfg.force_resegment = True` untuk membangun ulang dari awal.
+
+Langkah-langkah pipeline OTB:
+
+```
+otbcli_MeanShiftSmoothing      → lsms_smoothed.tif, lsms_spatial.tif
+otbcli_LSMSSegmentation        → lsms_labels_raw.tif
+otbcli_LSMSSmallRegionsMerging → lsms_labels.tif
+otbcli_LSMSVectorization       → segments.gpkg  (non-fatal if fails)
+```
+
+## Tahap 2 — Mean + std zonal
+
+Untuk setiap ~266 fitur piksel, hitung mean dan deviasi standar di semua piksel dalam setiap segmen. Hasilnya adalah 532 fitur zonal (266 × 2) yang tersimpan dalam DataFrame tingkat segmen.
+
+Implementasi menggunakan `numpy.bincount` untuk efisiensi:
+
+```python
+count = np.bincount(lbl, minlength=n_seg + 1)
+s     = np.bincount(lbl, weights=val, minlength=n_seg + 1)
+sq    = np.bincount(lbl, weights=val * val, minlength=n_seg + 1)
+mean  = s / count
+std   = np.sqrt(sq / count - mean ** 2)
+```
+
+Waktu berjalan: ~4 menit pada jalankan pertama.
+
+## Tahap 3 — Tekstur, bentuk, dan SAR
+
+Tiga sub-tahap berjalan setelah statistik zonal:
+
+1. **Tekstur** — 6 fitur tingkat segmen dari NDVI dan NIR median temporal.
+2. **Bentuk** — 5 fitur geometri dari raster label.
+3. **SAR** — mean + std zonal per band dari `S1_temporal_features.tif` dan `PALSAR_features.tif`, yang diproyeksikan ulang ke grid PlanetScope sebelum agregasi.
+
+File SAR bersifat opsional: file yang hilang dilewati dengan peringatan dan pipeline terus berjalan tanpa file tersebut.
+
+## Tahap 4 — Perakitan DataFrame segmen
+
+Semua larik fitur dirakit menjadi satu DataFrame Pandas yang diindeks oleh `segment_id` (1 … n_seg). Serpihan batas (<4 piksel) diatur menjadi semua-NaN. Kolom yang mengandung NaN sebagian diimputasi dengan median.
+
+## Tahap 5 — Pelabelan titik pelatihan ke segmen
+
+Untuk L1:
+
+1. Baca `samples.gpkg`, filter ke ID kelas L1 yang valid.
+2. Petakan setiap titik ke segmen yang memuatnya melalui pencarian piksel terdekat.
+3. Per segmen: hitung suara per kelas dari semua titik di dalamnya.
+4. Pertahankan segmen dengan **mayoritas ketat** (kelas teratas > kelas kedua). Hasil seri dibuang.
+
+Ini adalah **skema voting mayoritas v1** — v2 memperluas setiap titik menjadi satu baris dengan bobot sampel, yang menimbulkan konflik label lintas-split dan menyebabkan regresi dari ~84% OA menjadi ~60% OA.
+
+## Tahap 6 — Holdout 70/30
+
+Benih acak tetap (42) membagi segmen berlabel 70/30. Benih yang sama digunakan untuk L1 dan L2 (L2 menggunakan benih + 1) sehingga hasil dapat direproduksi.
+
+## Tahap 7 — Pelatihan Random Forest (L1)
+
+```python
+RandomForestClassifier(
+    n_estimators=100,
+    min_samples_leaf=1,
+    max_samples=0.5,       # bag_fraction
+    bootstrap=True,
+    max_features="sqrt",
+    random_state=42,
+    n_jobs=-1,
+)
+```
+
+Baik **model fitur lengkap** (semua 591 fitur) maupun **model subset top-20** dilatih dan dilaporkan. Dalam praktiknya keduanya berkinerja identik setelah segmen cukup homogen — mengonfirmasi bahwa sebagian besar dari 591 fitur bersifat redundan.
+
+## Tahap 8 — Kepentingan fitur dan analisis kelompok
+
+Kepentingan fitur Gini ditulis ke `feature_importance_obia_v3.csv`. Fungsi pengelompokan memetakan setiap fitur ke kelompok bernama (SAR_S1, SAR_PALSAR, Spectral_Bands, NDVI_Indices, Temporal_Harmonic, Tree_Height, Shape, Texture, dll.) dan menghitung total serta rata-rata per kelompok.
+
+Analisis terpisah tingkat epoch melaporkan tanggal PlanetScope mana dari 10 tanggal yang memberikan informasi paling banyak.
+
+## Tahap 9 — Validasi silang 5-fold
+
+```python
+KFold(n_splits=5, shuffle=True, random_state=42)
+```
+
+Dijalankan pada semua segmen berlabel (bukan hanya split pelatihan). OA dan kappa validasi silang dilaporkan untuk model fitur lengkap maupun model top-20.
+
+## Tahap 10 — Prediksi raster penuh (L1)
+
+Pendekatan berbasis LUT: prediksi kelas untuk setiap `segment_id` unik satu kali, kemudian terapkan tabel pencarian ke raster label penuh. Ini menghindari pengulangan inferensi per piksel dan efisien dalam memori untuk 316 ribu segmen.
+
+Dua raster keluaran: `PS_LandCover_OBIA_v3.tif` (fitur lengkap) dan `PS_LandCover_OBIA_v3_Top20.tif`.
+
+## Tahap 11 — Penugasan subtipe hutan L2
+
+Segmen Vegetasi Lebat (kelas L1 = 5) diberi subtipe hutan. Dua mode tersedia melalui `cfg.l2_method`:
+
+### Overlay poligon (kanonik)
+
+```python
+cfg.l2_method = "polygon"
+```
+
+Membaca shapefile yang telah didigitasi dari poligon Hutan Alam, Hutan Produksi, dan Agroforest. Setiap segmen Lebat diberi kelas poligon mayoritas di atas pikselnya. Segmen di luar poligon mana pun default ke Agroforest (tipe lebat yang paling umum tidak didigitasi di AOI ini).
+
+### Random Forest (ablasi / eksploratif)
+
+```python
+cfg.l2_method = "random_forest"
+```
+
+Melatih Random Forest kedua pada subset berlabel-Lebat menggunakan 591 fitur yang sama. Keluaran mode RF diberi akhiran `_RF` sehingga berdampingan dengan keluaran kanonik.
+
+Performa L2 RF saat ini (2026-05-03, 137 sampel):
+
+| | Alam | Produksi | Agroforest |
+|---|-----:|--------:|-----------:|
+| Alam (n=18) | 11 | 5 | 2 |
+| Produksi (n=14) | 7 | 7 | 0 |
+| Agroforest (n=8) | 1 | 2 | 5 |
+
+Kesalahan dominan adalah Produksi diklasifikasikan sebagai Alam (7/14). Menambahkan 30–50 sampel Produksi yang tidak ambigu adalah tindakan bernilai tertinggi untuk meningkatkan L2.
+
+## Tahap 12 — Raster hierarkis akhir
+
+`predict_hierarchical()` menggabungkan prediksi L1 dan L2 menjadi raster 9 kelas akhir:
+
+```
+for each segment:
+    if L1 ≠ Dense Vegetation → remap to final ID (1-4, 8, 9)
+    if L1 = Dense Vegetation → apply L2 assignment (5, 6, or 7)
+```
+
+Keluaran: `PS_LandCover_OBIA_v3_Final.tif`
+
+### Aturan pasca-hoc YRF (dinonaktifkan)
+
+Sebuah aturan untuk mengklasifikasikan ulang segmen berkanopi pendek, NDVI tinggi sebagai Hutan Regenerasi Muda diuji dan dinonaktifkan. Dengan ambang `kanopi 3–10 m DAN p50NDVI > 0,6`, aturan ini mengklasifikasikan ulang 20% AOI sebagai YRF — jauh melebihi perluasan YRF yang masuk akal. Aktifkan kembali dengan `cfg.yrf_apply = True` hanya jika sampel latih YRF eksplisit tersedia.
+
+## Tahap 13 — Keluaran ringkasan
+
+Semua metrik, distribusi, dan jalur ditulis ke `summary.json`. F1 per kelas dan matriks kebingungan ada di file CSV. Kepentingan fitur ada di `feature_importance_obia_v3.csv`.
+
+## Pipeline ekspor SAR (`build_sar_features.py`)
+
+Unduhan langsung pada 30 m menjaga ukuran file tetap jauh di bawah batas Earth Engine (~50 MB):
+
+- Tumpukan 19-band S1: **1,6 MB** pada 30 m (vs ~230 MB pada 10 m)
+- PALSAR 5-band: **5,1 MB** pada 30 m
+
+Pada 10 m, skrip secara otomatis merutekan melalui Google Drive (`--scale 10`). Ekspor Drive harus diunduh secara manual setelah tugas selesai.
+
+## Switch ablasi
+
+`Config` mendukung dua flag ablasi untuk desain eksperimen 2×2 dalam makalah:
+
+| Flag | Efek |
+|------|------|
+| `epochs_subset = ["sept"]` | Gunakan fitur satu epoch saja (menghilangkan fitur temporal) |
+| `ps_only = True` | Hapus semua sumber non-PlanetScope (SAR, tinggi kanopi, Meta v2) |
+
+Keluaran ablasi masuk ke direktori saudara dengan akhiran yang mengkodekan konfigurasi (misalnya `outputs_10epoch_obia_v3_1ep_psonly/`) sehingga keluaran kanonik tidak pernah ditimpa.

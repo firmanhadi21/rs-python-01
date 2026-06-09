@@ -1,0 +1,231 @@
+<section class="module" id="module-5" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">05</span>
+      <h1 class="module-title">Membaca Angka</h1>
+      <p class="module-subtitle">Apa yang sebenarnya disampaikan metrik akurasi — dan cara menggunakan feature importance untuk memperbaiki model</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- Screen 1: OA, Kappa -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Overall Accuracy dan Kappa — apa arti angka utama ini</h2>
+        <p>Setelah pelatihan, pipeline menahan 30% segmen berlabel untuk ujian akhir — segmen yang tidak pernah dilihat model selama pelatihan. Model memprediksi kelas untuk setiap segmen, lalu membandingkannya dengan label ground truth.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">🎯</div>
+            <h4 class="pattern-title">Overall Accuracy (OA)</h4>
+            <p class="pattern-desc">Persentase segmen validasi yang diklasifikasikan dengan benar. 89,5% berarti 9 dari 10 segmen yang belum pernah dilihat mendapatkan label yang tepat. Intuitif, tetapi menyesatkan jika kelas tidak seimbang.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📊</div>
+            <h4 class="pattern-title">Kappa Cohen</h4>
+            <p class="pattern-desc">Kappa menyesuaikan OA terhadap kesesuaian secara kebetulan. Jika model hanya memprediksi "Vegetasi Jarang" untuk segalanya, ia akan mendapatkan 46% OA secara gratis. Kappa menghukum hal itu. Kappa 0,875 adalah nilai yang sangat baik.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🔁</div>
+            <h4 class="pattern-title">5-Fold Cross-Validation</h4>
+            <p class="pattern-desc">Ulangi pembagian latih/uji sebanyak 5 kali dengan partisi berbeda. Rata-rata (92,0%) dan standar deviasi (±1,6%) bersama-sama memberi tahu Anda: "model ini sekaligus akurat dan stabil."</p>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Standar deviasi CV lebih penting dari yang Anda kira</strong>
+            <p>Model segmentasi kasar memiliki CV OA 81% ± 4,9pp. Model halus: 88,7% ± 1,7pp. Rata-ratanya membaik, tetapi standar deviasi yang menyusut 3 kali lebih kecil jauh lebih penting untuk produksi — ini berarti model konsisten di berbagai pembagian data, bukan hanya beruntung pada satu pembagian saja.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: F1 score per class -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">F1 Score — nilai jujur per kelas</h2>
+        <p>Akurasi keseluruhan menyembunyikan kegagalan di tingkat kelas. <span class="term" data-definition="F1 score adalah rata-rata harmonik dari Precision (seberapa sering prediksi positif Anda benar) dan Recall (berapa banyak nilai positif sejati yang berhasil Anda temukan). Nilai 1,0 adalah sempurna; 0,0 tidak berguna. Metrik ini menghukum false alarm maupun miss secara merata.">F1 score</span> menangkap kegagalan tersebut: kelas dengan F1 = 0,50 mendapatkan setengah prediksinya salah, meskipun OA terlihat baik.</p>
+
+        <div class="badge-list stagger-children animate-in">
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-accent)">Others: 0.97</code>
+            <span class="badge-desc">Kelas tangkapan semua — sangat konsisten karena segala hal yang ambigu dikirim ke sini</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-actor-2)">Built-up: 0.90</code>
+            <span class="badge-desc">Atap dan jalan memiliki tanda spektral + radar yang unik — kepercayaan tinggi</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-actor-2)">Paddy: 0.89</code>
+            <span class="badge-desc">Siklus NDWI musiman yang kuat membuat sawah mudah dikenali</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-actor-2)">Waterbody: 0.93</code>
+            <span class="badge-desc">Air secara spektral unik — reflektansi sangat rendah di semua band</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-actor-4)">Crops: 0.91</code>
+            <span class="badge-desc">+0,24 dibanding model kasar — segmen lebih halus memecah kebingungan lahan/vegetasi jarang</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-actor-4)">Sparse Vegetation: 0.82</code>
+            <span class="badge-desc">+0,25 dibanding model kasar — peningkatan terbesar dari segmentasi halus</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-actor-5)">Dense Vegetation: 0.83</code>
+            <span class="badge-desc">L1 benar — subtipe kemudian ditangani di L2 dengan Random Forest terpisah</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: Feature importance -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Apa yang sebenarnya dipelajari model untuk diperhatikan</h2>
+        <p><span class="term" data-definition="Feature importance dalam Random Forest mengukur seberapa besar setiap variabel input membantu mengurangi kesalahan prediksi di semua 100 pohon. Importance lebih tinggi berarti fitur tersebut menyebabkan lebih banyak pemisahan yang benar. Semua importance dijumlahkan menjadi 1,0.">Feature importance</span> seperti sorotan cahaya pada perhatian model. Setelah pelatihan, Anda bisa bertanya: "Dari 591 fitur, mana yang paling diandalkan oleh pohon-pohon?" Jawabannya mengejutkan — dan dapat ditindaklanjuti.</p>
+
+        <div class="step-cards stagger-children animate-in">
+          <div class="step-card">
+            <div class="step-num">#1</div>
+            <div class="step-body">
+              <strong>tree_height_mean__mean (0.0192)</strong>
+              <p>Seberapa tinggi rata-rata kanopi di seluruh segmen ini? Tidak ada yang memisahkan hutan alami setinggi 40 m dari tanaman setinggi 1 m lebih cepat dari satu angka ini.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">#2</div>
+            <div class="step-body">
+              <strong>ampNDBI__mean (0.0133) — amplitudo musiman Indeks Tanah Terbuka</strong>
+              <p>Seberapa besar sinyal tanah terbuka berfluktuasi sepanjang tahun? Hutan tetap stabil. Tanaman pertanian berubah dari tanah terbuka menjadi bervegetasi dan kembali lagi. Ritme ini adalah kunci untuk memisahkan keduanya.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">#3</div>
+            <div class="step-body">
+              <strong>tree_height_std__mean (0.0128)</strong>
+              <p>Seberapa bervariasi ketinggian kanopi di dalam segmen ini? Perkebunan seragam memiliki std rendah. Hutan alami campuran dengan celah memiliki std tinggi. Ini membedakan subtipe hutan.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">#5</div>
+            <div class="step-body">
+              <strong>PALSAR_HV_db__mean (0.0121) — cross-polarisasi radar L-band</strong>
+              <p>Radar L-band menembus kanopi dan memantul dari batang kayu. HV tinggi = biomassa kayu yang padat. Ini adalah informasi struktural yang tidak dapat disediakan oleh band optik mana pun.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">20 fitur teratas setara dengan 591 fitur lengkap</strong>
+            <p>Model Top-20 mencapai akurasi yang identik dengan model fitur lengkap. Ini adalah tanda kejenuhan fitur — begitu segmen cukup homogen (LSMS halus), 20 fitur teratas menangkap semua yang dibutuhkan model. Anda bisa menerapkan model 20 fitur 30 kali lebih cepat tanpa kehilangan akurasi.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: The L2 problem and how to fix it -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Masalah L2 — dan cara memperbaikinya</h2>
+        <p>Klasifier subtipe hutan L2 mencapai akurasi 57,5% pada 40 segmen validasi. Mode kegagalan yang dominan: 7 dari 14 segmen Hutan Produksi berlabel sebagai Hutan Alami.</p>
+        <p>Berikut adalah matriks kebingungan lengkapnya:</p>
+
+        <div style="overflow-x:auto; margin: var(--space-6) 0;">
+          <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:var(--text-sm)">
+            <thead>
+              <tr style="background:var(--color-bg-code);color:#CDD6F4">
+                <th style="padding:var(--space-3);text-align:left"></th>
+                <th style="padding:var(--space-3);text-align:center">Pred. Alami</th>
+                <th style="padding:var(--space-3);text-align:center">Pred. Produksi</th>
+                <th style="padding:var(--space-3);text-align:center">Pred. Agroforest</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="background:var(--color-surface)">
+                <td style="padding:var(--space-3);font-weight:600">Aktual Alami (n=18)</td>
+                <td style="padding:var(--space-3);text-align:center;color:var(--color-accent);font-weight:700">11</td>
+                <td style="padding:var(--space-3);text-align:center">5</td>
+                <td style="padding:var(--space-3);text-align:center">2</td>
+              </tr>
+              <tr style="background:var(--color-bg-warm)">
+                <td style="padding:var(--space-3);font-weight:600">Aktual Produksi (n=14)</td>
+                <td style="padding:var(--space-3);text-align:center;color:var(--color-error);font-weight:700">7</td>
+                <td style="padding:var(--space-3);text-align:center;color:var(--color-accent)">7</td>
+                <td style="padding:var(--space-3);text-align:center">0</td>
+              </tr>
+              <tr style="background:var(--color-surface)">
+                <td style="padding:var(--space-3);font-weight:600">Aktual Agroforest (n=8)</td>
+                <td style="padding:var(--space-3);text-align:center">1</td>
+                <td style="padding:var(--space-3);text-align:center">2</td>
+                <td style="padding:var(--space-3);text-align:center;color:var(--color-accent);font-weight:700">5</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>Hutan Produksi dan Hutan Alami keduanya memiliki kanopi yang tinggi dan lebat. Fitur yang seharusnya memisahkan keduanya — <code style="background:var(--color-bg-code);color:#CBA6F7;padding:2px 6px;border-radius:4px">tree_height_std</code>, <code style="background:var(--color-bg-code);color:#CBA6F7;padding:2px 6px;border-radius:4px">S1_VV_stdDev</code> — tersedia, tetapi model hanya memiliki 48 contoh latih Produksi untuk dipelajari. Solusinya jelas: kumpulkan 30–50 titik latih Hutan Produksi tambahan dari area di mana baris penanaman terlihat pada citra dasar satelit.</p>
+      </section>
+
+      <!-- Screen 5: Final quiz — applying it all -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Tantangan akhir — membaca skenario nyata</h2>
+
+        <div class="quiz-container" id="quiz-module5">
+          <div class="quiz-question-block"
+               data-correct="b"
+               data-explanation-right="Tepat. CV OA sebesar 64,9% ± 7,6% menunjukkan model bekerja tetapi tidak stabil — standar deviasi ±7,6pp berarti satu fold mendapat skor 57% dan fold lain 73%, yang secara efektif merupakan model yang berbeda. Ketidakstabilan itu menunjukkan data latih yang tidak cukup (137 sampel untuk 3 kelas sangat sedikit). Lebih banyak sampel = fold yang lebih stabil."
+               data-explanation-wrong="Bukan jawaban terkuat. OA saja tidak mengungkap masalahnya. Sinyal utamanya adalah standar deviasi yang tinggi pada CV OA (±7,6pp) — model yang stabil dan terlatih dengan baik memiliki variasi yang jauh lebih kecil antar fold.">
+            <h3 class="quiz-question">Model L2 melaporkan CV OA sebesar 64,9% ± 7,6%. Seorang rekan berkata "64,9% sudah lumayan." Apa yang disampaikan ±7,6% yang terlewat oleh mereka?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Bahwa model mengalami overfitting — model menghafal data latih tetapi gagal pada data baru</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Bahwa model tidak stabil — akurasi berfluktuasi 15pp antar fold, menandakan terlalu sedikit sampel latih</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Bahwa model mengalami underfitting — model membutuhkan lebih banyak fitur untuk membedakan kelas</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="a"
+               data-explanation-right="Benar. Tabel feature importance menunjukkan tree_height_mean dan tree_height_std berada di posisi #1 dan #3. Dengan penambahan data ketinggian kanopi Meta v2, Holdout OA L2 meningkat dari 57,5% menjadi 62,5% — kenaikan 5pp hanya dari 8 fitur baru. Dataset adalah hambatannya, dan data yang lebih kaya mengalahkan model yang lebih kompleks pada ukuran sampel ini."
+               data-explanation-wrong="Kurang tepat. Arsitektur model (n_estimators, max_features) sudah dituning dengan baik untuk ukuran dataset ini. Hambatannya adalah kualitas dan kuantitas data — yang mengarah pada data ketinggian kanopi yang lebih baik atau lebih banyak sampel latih, bukan penyetelan hyperparameter.">
+            <h3 class="quiz-question">Anda ingin meningkatkan akurasi L2 tanpa mengumpulkan lebih banyak titik latih. Tindakan mana yang akan berdampak paling besar?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Tambahkan data ketinggian kanopi resolusi lebih tinggi — ini adalah fitur terpenting #1 dan #3 dalam model</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Tingkatkan n_estimators dari 100 menjadi 500 — lebih banyak pohon berarti rata-rata ensemble yang lebih baik</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Beralih dari Random Forest ke XGBoost — algoritma yang lebih powerful</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module5')">Periksa Jawaban</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module5')">Coba Lagi</button>
+        </div>
+
+        <div class="callout callout-info" style="margin-top: var(--space-8)">
+          <div class="callout-icon">🚀</div>
+          <div class="callout-content">
+            <strong class="callout-title">Langkah selanjutnya untuk pipeline ini</strong>
+            <p>1) Tambahkan 30–50 sampel latih Hutan Produksi. 2) Selidiki mengapa 46% AOI adalah Vegetasi Jarang — sebagian mungkin merupakan Agroforest pinggiran yang salah klasifikasi. 3) Uji aturan YRF (Young Regenerated Forest) dengan sampel khusus. 4) Pertimbangkan SAR skala halus pada 10 m untuk model L2 setelah set latih lebih besar.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
