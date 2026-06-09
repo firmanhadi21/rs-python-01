@@ -1,0 +1,168 @@
+<section class="module" id="module-1" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">01</span>
+      <h1 class="module-title">From Satellites to Forest Maps</h1>
+      <p class="module-subtitle">What this pipeline actually does — and what happens the moment you run it</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- Screen 1: The product -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A satellite image goes in. A forest map comes out.</h2>
+        <p>The Cisokan watershed in West Java is a mosaic of paddy fields, plantations, forest, and buildings — and from space, it's hard to tell them apart. This pipeline reads satellite images and automatically labels every patch of ground with one of nine land-cover classes.</p>
+        <p>The result is a <span class="term" data-definition="A raster is a grid of pixels, like a photo — but instead of colours, each pixel stores a land-cover class number. Think of it as a heat map where the colour means &quot;forest&quot; or &quot;paddy&quot; rather than temperature.">raster</span> map where every pixel answers: <em>what is this piece of land?</em></p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🛰️</div>
+            <h4 class="pattern-title">Input</h4>
+            <p class="pattern-desc">10 PlanetScope satellite images taken over 2 years, plus radar and canopy-height data</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">⚙️</div>
+            <h4 class="pattern-title">Pipeline</h4>
+            <p class="pattern-desc">12 Python scripts that segment, measure, and classify — running for 45–90 minutes on a cold start</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">🗺️</div>
+            <h4 class="pattern-title">Output</h4>
+            <p class="pattern-desc">A 9-class land-cover map at 3 m resolution covering the entire watershed</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: The user journey / trace -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Trace what happens when you run it</h2>
+        <p>Imagine you open a terminal and type <code style="background:var(--color-bg-code);color:#A6E3A1;padding:2px 8px;border-radius:4px">python planetscope_10epoch_obia_v3.py</code>. Here is the exact journey your data takes — from raw satellite pixels to a coloured forest map on screen.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"flow-actor-1","label":"Stage 0: The script reads 10 PlanetScope GeoTIFF images from disk — 8 spectral bands each"},
+          {"highlight":"flow-actor-1","label":"Stage 1: OTB LSMS segments the image into 316,000 homogeneous patches (like cutting a mosaic into tiles)","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"flow-actor-2","label":"Stage 2-3: For each segment, 591 measurements are computed — spectral averages, radar backscatter, tree height...","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"flow-actor-3","label":"Stage 5-6: Training points from the field are matched to segments. 70% become the teacher, 30% become the exam.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"flow-actor-4","label":"Stage 7: A Random Forest classifier learns from the 70% and predicts classes for all 316k segments","packet":true,"from":"actor-4","to":"actor-5"},
+          {"highlight":"flow-actor-5","label":"Stage 10-12: The predicted classes are painted onto the image grid, producing the final 9-class map"}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon">🛰️</div>
+              <span>Raw Images</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon">✂️</div>
+              <span>Segments</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon">📊</div>
+              <span>Features</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon">🌲</div>
+              <span>RF Model</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-5">
+              <div class="flow-actor-icon">🗺️</div>
+              <span>Land Map</span>
+            </div>
+          </div>
+          <div class="flow-packet" id="flow-packet"></div>
+          <div class="flow-step-label" id="flow-label">Click "Next Step" to trace the pipeline</div>
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next Step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: The 9 classes -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Nine answers the map can give</h2>
+        <p>The pipeline uses a <strong>two-level hierarchy</strong>. Level 1 sorts land into 7 broad categories. Level 2 zooms into "Dense Vegetation" and splits it into three forest subtypes.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#2A7B9B">💧</div>
+            <div><strong>1 — Waterbody</strong><p>Lakes, rivers, the Cisokan reservoir — any open water surface</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#D4A843">🌾</div>
+            <div><strong>2 — Paddy</strong><p>Irrigated rice fields — strong NDVI swing between planting and harvest</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#9E9790">🏠</div>
+            <div><strong>3 — Built-up</strong><p>Roads, rooftops, settlements — high brightness across all seasons</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#6B6560">🌫️</div>
+            <div><strong>4 — Others</strong><p>Clouds, shadows, mixed pixels — anything that defies the other labels</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#1a5c35">🌳</div>
+            <div><strong>5 — Natural Forest</strong><p>Old-growth and secondary forest — tallest canopy, highest biomass</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#2D8B55">🌲</div>
+            <div><strong>6 — Production Forest</strong><p>Timber plantations — dense but younger, more uniform canopy</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#5AAD7A">🫖</div>
+            <div><strong>7 — Agroforest</strong><p>Mixed gardens (coffee, rubber, fruit trees) — heterogeneous and hard to classify</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#D4A843">🌿</div>
+            <div><strong>8 — Sparse Vegetation</strong><p>Grassland, shrubs, degraded land — covers 46% of the watershed</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#E06B56">🌽</div>
+            <div><strong>9 — Crops</strong><p>Upland agriculture — corn, cassava, mixed annual crops</p></div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why "Bareland" was dropped</strong>
+            <p>Cisokan has very little permanently bare soil — what looked like "Bareland" was mostly transient states (harvested paddy, fallow, cloud shadows). Forcing the model to learn an incoherent class made everything worse. Removing it lifted overall accuracy from 87% to 89.5%.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: Key results up front -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">How well does it work?</h2>
+        <p>Before diving into the machinery, here's the headline: the pipeline achieves <strong>89.5% overall accuracy</strong> for the 7-class L1 map — verified on 228 held-out segments the model never saw during training.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">🎯</div>
+            <h4 class="pattern-title">L1 Accuracy</h4>
+            <p class="pattern-desc">89.5% overall accuracy, 92% in 5-fold cross-validation. Every class reaches F1 ≥ 0.82.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🌲</div>
+            <h4 class="pattern-title">L2 Accuracy</h4>
+            <p class="pattern-desc">57.5% for forest subtypes — harder problem, only 137 training samples. Production forest is the toughest class.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📈</div>
+            <h4 class="pattern-title">Key driver</h4>
+            <p class="pattern-desc">Canopy height data (#1 and #3 most important features) — tree height separates forest from farmland better than any spectral band.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🗺️</div>
+          <div class="callout-content">
+            <strong class="callout-title">What you will learn in this course</strong>
+            <p>Module 2 introduces the 12 scripts. Module 3 unpacks how raw pixels become 591 measurements. Module 4 explains segmentation and the Random Forest. Module 5 shows how to read accuracy numbers and where to improve the model.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

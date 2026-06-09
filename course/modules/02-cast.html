@@ -1,0 +1,220 @@
+<section class="module" id="module-2" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">02</span>
+      <h1 class="module-title">Meet the Cast</h1>
+      <p class="module-subtitle">12 Python scripts, each with a single job — and the three satellite data sources they feed on</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- Screen 1: The scripts as characters -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Think of each script like a specialist on a film crew</h2>
+        <p>No single person on a film set does everything — the director doesn't also operate the camera. Same idea here. Each <span class="term" data-definition="A Python script is a plain text file ending in .py that contains instructions for the computer. You run it by typing &quot;python filename.py&quot; in the terminal.">Python script</span> has one focused responsibility, and they hand work to each other in a clear order.</p>
+        <p>The scripts break into four groups: data downloaders, feature builders, classifiers, and analysis tools.</p>
+
+        <div class="file-tree animate-in">
+          <div class="ft-folder open">
+            <span class="ft-name">Data Download</span>
+            <div class="ft-children">
+              <div class="ft-file"><span class="ft-name">build_sar_features.py</span><span class="ft-desc">Downloads Sentinel-1 + PALSAR-2 from Google Earth Engine</span></div>
+              <div class="ft-file"><span class="ft-name">download_meta_canopy_v2.py</span><span class="ft-desc">Streams canopy height tiles from Meta's public S3 bucket</span></div>
+              <div class="ft-file"><span class="ft-name">ee_init.py</span><span class="ft-desc">Authenticates to Earth Engine — always imported first</span></div>
+            </div>
+          </div>
+          <div class="ft-folder open">
+            <span class="ft-name">Feature Building</span>
+            <div class="ft-children">
+              <div class="ft-file"><span class="ft-name">planetscope_10epoch_local.py</span><span class="ft-desc">Builds the 138-feature pixel cache from PlanetScope images</span></div>
+              <div class="ft-file"><span class="ft-name">curate_samples_for_obia.py</span><span class="ft-desc">Cleans training points — one per segment, no conflicts</span></div>
+            </div>
+          </div>
+          <div class="ft-folder open">
+            <span class="ft-name">Classification</span>
+            <div class="ft-children">
+              <div class="ft-file"><span class="ft-name">planetscope_10epoch_obia_v3.py</span><span class="ft-desc">The main script — runs all 13 pipeline stages end-to-end</span></div>
+            </div>
+          </div>
+          <div class="ft-folder open">
+            <span class="ft-name">SAM Segmentation (alternative)</span>
+            <div class="ft-children">
+              <div class="ft-file"><span class="ft-name">sam_preprocess.py</span><span class="ft-desc">Prepares the RGB input for Meta SAM</span></div>
+              <div class="ft-file"><span class="ft-name">sam_run.py</span><span class="ft-desc">Runs the Segment Anything Model on the AOI</span></div>
+              <div class="ft-file"><span class="ft-name">sam_filter.py</span><span class="ft-desc">Filters and fills SAM polygons</span></div>
+              <div class="ft-file"><span class="ft-name">sam_option_a.py</span><span class="ft-desc">Alternative: uses SAM cut lines to subdivide Dense segments</span></div>
+            </div>
+          </div>
+          <div class="ft-folder open">
+            <span class="ft-name">Analysis &amp; Visualisation</span>
+            <div class="ft-children">
+              <div class="ft-file"><span class="ft-name">separability_plot.py</span><span class="ft-desc">How well-separated are the classes? 3-panel figure.</span></div>
+              <div class="ft-file"><span class="ft-name">spectral_signature_plot.py</span><span class="ft-desc">What does each class look like across 138 features?</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: The three data sources -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Three eyes in the sky</h2>
+        <p>The classifier doesn't rely on a single satellite. It fuses three completely different data types — each one sees something the others can't.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-1)">🌈</div>
+            <div>
+              <strong>PlanetScope SuperDove — 8 optical bands, 3 m resolution</strong>
+              <p>Ten images taken from March 2024 to March 2026. The backbone of the pipeline — tells you how green, wet, or bright each patch is, and how it changes across seasons.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-2)">📡</div>
+            <div>
+              <strong>Sentinel-1 SAR + PALSAR-2 — Radar, sees through clouds</strong>
+              <p>Radar pulses bounce back differently from rough bark versus smooth water versus metal roofs. Works at night and in rain. 19 Sentinel-1 + 5 PALSAR-2 features.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-3)">📏</div>
+            <div>
+              <strong>Canopy Height — Meta v2 + ETH</strong>
+              <p>How tall is the vegetation? A 40 m Natural Forest tree looks nothing like a 3 m shrub. Canopy height is the single most important feature in the whole model.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why radar?</strong>
+            <p><span class="term" data-definition="SAR stands for Synthetic Aperture Radar. Instead of measuring reflected sunlight like a camera, it sends its own radio pulse and measures the echo. Radar waves pass through clouds, making it usable on cloudy days when optical satellites are blind.">SAR</span> sees what optical sensors can't: forest structure. L-band radar (PALSAR-2) actually penetrates the canopy and bounces off trunks, while C-band (Sentinel-1) scatters from leaves and branches. Together they encode biomass information that pure colour cameras can't provide.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: Group chat — scripts talking to each other -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The scripts on game day</h2>
+        <p>On a fresh setup, the scripts run in this order, handing work to each other. Here's how they'd describe it to each other:</p>
+
+        <div class="chat-window" id="chat-module2">
+          <div class="chat-messages">
+            <div class="chat-message" data-msg="0" data-sender="ee" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">EE</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">ee_init.py</span>
+                <p>Earth Engine credentials loaded. Project authenticated. Ready.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="1" data-sender="sar" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">SR</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">build_sar_features.py</span>
+                <p>Downloaded Sentinel-1 (1.6 MB) and PALSAR-2 (5.1 MB) from Earth Engine. Wrote S1_temporal_features.tif and PALSAR_features.tif.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="2" data-sender="meta" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">CH</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">download_meta_canopy_v2.py</span>
+                <p>Streamed canopy height tiles from Meta S3. Wrote avg, stdev, p95, and cover GeoTIFFs at 3 m.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="3" data-sender="local" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-4)">LC</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-4)">planetscope_10epoch_local.py</span>
+                <p>Processed 10 PlanetScope images. Computed NDVI, NDWI, NDBI, EVI per epoch. Wrote 138 feature TIFs to feature_cache/. Also trained a pixel-level RF but that output is legacy only.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="4" data-sender="curate" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">CU</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">curate_samples_for_obia.py</span>
+                <p>Read 862 training points from samples.gpkg. Kept one point per segment, flagged conflicts. Ready: samples_curated.gpkg.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="5" data-sender="main" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-accent)">V3</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-accent)">planetscope_10epoch_obia_v3.py</span>
+                <p>Got it. Segmenting... 316,209 segments found. Computing 591 features per segment... training Random Forest... OA 89.5%. Writing PS_LandCover_OBIA_v3_Final.tif. Done.</p>
+              </div>
+            </div>
+          </div>
+          <div class="chat-typing" id="chat-module2-typing" style="display:none">
+            <div class="chat-avatar" id="chat-module2-typing-avatar" style="background: var(--color-actor-2)">?</div>
+            <div class="chat-typing-dots">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+          </div>
+          <div class="chat-controls">
+            <button class="btn chat-next-btn">Next Message</button>
+            <button class="btn chat-all-btn">Play All</button>
+            <button class="btn chat-reset-btn">Replay</button>
+            <span class="chat-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: The run order quiz -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Put your knowledge to the test</h2>
+        <p>Before moving on, check your understanding of which scripts do what — and when to run them.</p>
+
+        <div class="quiz-container" id="quiz-module2">
+          <div class="quiz-question-block"
+               data-correct="b"
+               data-explanation-right="Exactly. planetscope_10epoch_local.py builds the pixel feature cache that obia_v3.py reads on startup. You only need to re-run it if the source GeoTIFFs change."
+               data-explanation-wrong="Not quite. Think about which script reads the 10 PlanetScope images and computes the per-pixel features that obia_v3 relies on.">
+            <h3 class="quiz-question">You have new PlanetScope images from a fresh download. Which script must you run before the main classifier?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>build_sar_features.py — to refresh SAR data</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>planetscope_10epoch_local.py — to rebuild the pixel feature cache</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>curate_samples_for_obia.py — to re-assign training points</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="c"
+               data-explanation-right="Right. SAR sees forest structure via radar backscatter regardless of cloud cover or sunlight. That is the structural information optical cameras simply cannot measure."
+               data-explanation-wrong="Not this one. Think about what SAR data adds that a colour camera physically cannot provide — regardless of lighting or weather conditions.">
+            <h3 class="quiz-question">Why does the pipeline bother downloading SAR data when PlanetScope already has 8 spectral bands?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>SAR has better spatial resolution at 3 m</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>SAR covers more dates — 19 vs 10 epochs</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>SAR penetrates the canopy and encodes forest structure — something optical light cannot measure</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module2')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module2')">Try Again</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

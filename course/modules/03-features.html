@@ -1,0 +1,193 @@
+<section class="module" id="module-3" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">03</span>
+      <h1 class="module-title">591 Ways to See a Tree</h1>
+      <p class="module-subtitle">How raw satellite pixels become a 591-column table — one row per forest patch</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- Screen 1: Why 591? -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why does the model need 591 numbers per patch?</h2>
+        <p>A single pixel on a single date tells you very little. A paddy field and a wet dirt road look nearly identical in March. But watch them both across 10 dates, measure their radar response, check how tall the vegetation is — now they diverge completely.</p>
+        <p>The art of this pipeline is turning each 93-pixel segment into a rich "fingerprint" — 591 numbers that describe everything observable about that patch from space.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">🌈</div>
+            <h4 class="pattern-title">138 Legacy Pixel Features</h4>
+            <p class="pattern-desc">8 bands × 10 epochs = 80 raw band means, plus NDVI, NDWI, NDBI, EVI per epoch and temporal summaries. Built by planetscope_10epoch_local.py.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">📐</div>
+            <h4 class="pattern-title">100 New Epoch Indices</h4>
+            <p class="pattern-desc">10 spectral indices (NDRE, EVI2, BSI, OSAVI, VARI, MNDWI, CIG, GNDVI, ARI, SIPI) across all 10 dates. More discriminative than raw bands.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📡</div>
+            <h4 class="pattern-title">48 SAR Features</h4>
+            <p class="pattern-desc">19 Sentinel-1 + 5 PALSAR-2 bands, each with mean and std across the segment = 48 numbers. Radar backscatter encodes canopy roughness and soil moisture.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">📏</div>
+            <h4 class="pattern-title">12 Canopy Height Features</h4>
+            <p class="pattern-desc">Meta v2 (avg, stdev, p95, cover) + ETH (mean, std) — 6 raw × mean + std = 12. The #1 and #3 most important features in the entire model.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🔲</div>
+            <h4 class="pattern-title">11 Texture + Shape</h4>
+            <p class="pattern-desc">6 texture stats from NDVI/NIR (variance, contrast...) + 5 geometric properties (area, compactness, elongation...) per segment.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: The zonal stats trick -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The zonal stats trick — going from pixels to patches</h2>
+        <p>Think of each segment as a territory on a map. You want to describe that territory — not pixel by pixel, but as a whole. The pipeline uses a clever counting technique called <strong>zonal statistics</strong>.</p>
+        <p>For each of the 316,000 segments and each of ~266 pixel features, it computes two numbers: the <em>mean</em> (typical value inside this territory) and the <em>standard deviation</em> (how varied the values are). That gives 266 × 2 = 532 zonal features.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code>
+<span class="code-line"><span class="code-property">count</span> = np.<span class="code-function">bincount</span>(lbl, minlength=n_seg+<span class="code-number">1</span>)</span>
+<span class="code-line"><span class="code-property">s</span>     = np.<span class="code-function">bincount</span>(lbl, weights=val, minlength=n_seg+<span class="code-number">1</span>)</span>
+<span class="code-line"><span class="code-property">sq</span>    = np.<span class="code-function">bincount</span>(lbl, weights=val*val, minlength=n_seg+<span class="code-number">1</span>)</span>
+<span class="code-line"><span class="code-property">mean</span>  = s / count</span>
+<span class="code-line"><span class="code-property">std</span>   = np.<span class="code-function">sqrt</span>(sq/count - mean**<span class="code-number">2</span>)</span>
+            </code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Count how many pixels live in each segment (like a census)</p>
+              <p class="tl">Sum up all the pixel values inside each segment</p>
+              <p class="tl">Sum up all the squared values (needed to compute spread)</p>
+              <p class="tl">Divide total by count to get the average value per segment</p>
+              <p class="tl">Compute spread: how far individual pixels deviate from the average</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why numpy.bincount instead of a loop?</strong>
+            <p>A loop across 316k segments × 266 features × 93 pixels would take hours. <span class="term" data-definition="numpy is a Python library for fast numerical computation. It operates on entire arrays at once — rather than looping through items one at a time — which makes it 100-1000x faster for large datasets.">numpy.bincount</span> does the same work by accumulating histogram buckets in a single pass over the pixel array. Wall-clock time: ~4 minutes vs multiple hours.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: The spectral indices -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why compute indices instead of just using the raw bands?</h2>
+        <p>Raw reflectance values are sensitive to lighting, atmosphere, and sensor quirks. <span class="term" data-definition="A spectral index is a mathematical ratio of two or more spectral bands that highlights a specific property — like vegetation greenness or water content. Ratios cancel out many sources of noise that affect individual bands.">Spectral indices</span> are ratios that cancel out much of that noise and amplify the signal you care about.</p>
+
+        <div class="badge-list stagger-children animate-in">
+          <div class="badge-item">
+            <code class="badge-code">NDVI</code>
+            <span class="badge-desc">Normalised Difference Vegetation Index — how green and photosynthetically active. The classic.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">NDRE</code>
+            <span class="badge-desc">Red-Edge version of NDVI — more sensitive to canopy chlorophyll, less saturated over dense forest.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">NDWI / MNDWI</code>
+            <span class="badge-desc">Water index — high over water bodies, low over dry soil. Key for separating Paddy from Crops.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">BSI</code>
+            <span class="badge-desc">Bare Soil Index — high over exposed dirt, low over vegetation. Flips with NDVI.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">VARI</code>
+            <span class="badge-desc">Visible Atmospherically Resistant Index — works with RGB only, great for Crops in the March image.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">OSAVI / EVI2</code>
+            <span class="badge-desc">Soil-adjusted vegetation indices — better than NDVI where bare soil shows through sparse canopy.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: Temporal features -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Seasonality is the secret weapon</h2>
+        <p>A single date can be ambiguous — a harvested paddy field and a barren slope look identical in the dry season. But across 10 dates, paddy has a very specific signature: it goes green fast (planting), peaks, then goes brown fast (harvest). Forest stays green year-round.</p>
+        <p>The pipeline computes <strong>temporal summary features</strong> that capture this rhythm:</p>
+
+        <div class="step-cards stagger-children animate-in">
+          <div class="step-card">
+            <div class="step-num">P</div>
+            <div class="step-body">
+              <strong>Percentiles (p10, p25, p50, p75, p90)</strong>
+              <p>The 50th percentile (median) NDVI captures the "typical" greenness ignoring extreme dates. The spread between p10 and p90 captures seasonal swing.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">H</div>
+            <div class="step-body">
+              <strong>Harmonic coefficients (amplitude, offset, phase)</strong>
+              <p>Fit a sinusoidal wave to NDVI across time. Amplitude tells you how much it varies seasonally. Phase tells you when it peaks. Together they fingerprint crop calendars.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">Y</div>
+            <div class="step-body">
+              <strong>Year-over-Year difference</strong>
+              <p>Compare the same month across two years. Stable forest shows near-zero change. Cleared land shows a sudden NDVI drop. This detects disturbance.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🗓️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why September is the most important single date</strong>
+            <p>The feature importance rankings show that September indices (NDBI, NDWI, NDRE, OSAVI, BSI) dominate the top-15 list. September is the dry season — maximum contrast between bare soil, senescent crops, and evergreen forest. Seasonal timing matters as much as spectral range.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 5: DnD matching -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Match the feature to what it detects</h2>
+        <p>Drag each feature group to the land-cover property it is best at detecting.</p>
+
+        <div class="dnd-container" id="dnd-module3">
+          <div class="dnd-chips">
+            <div class="dnd-chip" draggable="true" data-answer="canopy">Canopy Height</div>
+            <div class="dnd-chip" draggable="true" data-answer="radar">PALSAR-2 HV</div>
+            <div class="dnd-chip" draggable="true" data-answer="ndwi">NDWI (water index)</div>
+            <div class="dnd-chip" draggable="true" data-answer="harmonic">Harmonic amplitude</div>
+          </div>
+          <div class="dnd-zones">
+            <div class="dnd-zone" data-correct="canopy">
+              <p class="dnd-zone-label">Separating tall Natural Forest from short shrubs and crops</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="radar">
+              <p class="dnd-zone-label">Penetrating the forest canopy to measure wood volume and biomass</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="ndwi">
+              <p class="dnd-zone-label">Distinguishing open water bodies and flooded paddy fields from dry land</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="harmonic">
+              <p class="dnd-zone-label">Detecting seasonal crop calendars — how much NDVI oscillates across the year</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+          </div>
+          <button class="btn" style="margin-top:1rem" onclick="checkDnD('dnd-module3')">Check Matches</button>
+          <button class="btn" style="margin-top:1rem;margin-left:.5rem" onclick="resetDnD('dnd-module3')">Reset</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

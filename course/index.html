@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cisokan Land Cover Classification — Interactive Course</title>
+
+  <!-- Google Fonts: Bricolage Grotesque · DM Sans · JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Forest green accent — suits vegetation/remote sensing perfectly -->
+  <style>
+    :root {
+      --color-accent:       #2D8B55;
+      --color-accent-hover: #226B41;
+      --color-accent-light: #E8F5EE;
+      --color-accent-muted: #5AAD7A;
+    }
+    body {
+      background-image: radial-gradient(
+        ellipse at 20% 50%,
+        rgba(45, 139, 85, 0.04) 0%,
+        transparent 50%
+      );
+    }
+  </style>
+
+  <script src="main.js" defer></script>
+</head>
+<body>
+
+  <nav class="nav" id="nav">
+    <div class="progress-bar" id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+    <div class="nav-inner">
+      <span class="nav-title">Cisokan Land Cover Classification</span>
+      <div class="nav-dots" id="nav-dots" role="tablist">
+        <button class="nav-dot" data-target="module-1" data-tooltip="From Satellites to Forest Maps" role="tab" aria-label="Module 1: From Satellites to Forest Maps"></button>
+        <button class="nav-dot" data-target="module-2" data-tooltip="Meet the Cast" role="tab" aria-label="Module 2: Meet the Cast"></button>
+        <button class="nav-dot" data-target="module-3" data-tooltip="591 Ways to See a Tree" role="tab" aria-label="Module 3: 591 Ways to See a Tree"></button>
+        <button class="nav-dot" data-target="module-4" data-tooltip="The Thinking Machine" role="tab" aria-label="Module 4: The Thinking Machine"></button>
+        <button class="nav-dot" data-target="module-5" data-tooltip="Reading the Numbers" role="tab" aria-label="Module 5: Reading the Numbers"></button>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+<section class="module" id="module-1" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">01</span>
+      <h1 class="module-title">From Satellites to Forest Maps</h1>
+      <p class="module-subtitle">What this pipeline actually does — and what happens the moment you run it</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- Screen 1: The product -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A satellite image goes in. A forest map comes out.</h2>
+        <p>The Cisokan watershed in West Java is a mosaic of paddy fields, plantations, forest, and buildings — and from space, it's hard to tell them apart. This pipeline reads satellite images and automatically labels every patch of ground with one of nine land-cover classes.</p>
+        <p>The result is a <span class="term" data-definition="A raster is a grid of pixels, like a photo — but instead of colours, each pixel stores a land-cover class number. Think of it as a heat map where the colour means &quot;forest&quot; or &quot;paddy&quot; rather than temperature.">raster</span> map where every pixel answers: <em>what is this piece of land?</em></p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🛰️</div>
+            <h4 class="pattern-title">Input</h4>
+            <p class="pattern-desc">10 PlanetScope satellite images taken over 2 years, plus radar and canopy-height data</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">⚙️</div>
+            <h4 class="pattern-title">Pipeline</h4>
+            <p class="pattern-desc">12 Python scripts that segment, measure, and classify — running for 45–90 minutes on a cold start</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">🗺️</div>
+            <h4 class="pattern-title">Output</h4>
+            <p class="pattern-desc">A 9-class land-cover map at 3 m resolution covering the entire watershed</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: The user journey / trace -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Trace what happens when you run it</h2>
+        <p>Imagine you open a terminal and type <code style="background:var(--color-bg-code);color:#A6E3A1;padding:2px 8px;border-radius:4px">python planetscope_10epoch_obia_v3.py</code>. Here is the exact journey your data takes — from raw satellite pixels to a coloured forest map on screen.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"flow-actor-1","label":"Stage 0: The script reads 10 PlanetScope GeoTIFF images from disk — 8 spectral bands each"},
+          {"highlight":"flow-actor-1","label":"Stage 1: OTB LSMS segments the image into 316,000 homogeneous patches (like cutting a mosaic into tiles)","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"flow-actor-2","label":"Stage 2-3: For each segment, 591 measurements are computed — spectral averages, radar backscatter, tree height...","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"flow-actor-3","label":"Stage 5-6: Training points from the field are matched to segments. 70% become the teacher, 30% become the exam.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"flow-actor-4","label":"Stage 7: A Random Forest classifier learns from the 70% and predicts classes for all 316k segments","packet":true,"from":"actor-4","to":"actor-5"},
+          {"highlight":"flow-actor-5","label":"Stage 10-12: The predicted classes are painted onto the image grid, producing the final 9-class map"}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon">🛰️</div>
+              <span>Raw Images</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon">✂️</div>
+              <span>Segments</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon">📊</div>
+              <span>Features</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon">🌲</div>
+              <span>RF Model</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-5">
+              <div class="flow-actor-icon">🗺️</div>
+              <span>Land Map</span>
+            </div>
+          </div>
+          <div class="flow-packet" id="flow-packet"></div>
+          <div class="flow-step-label" id="flow-label">Click "Next Step" to trace the pipeline</div>
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next Step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: The 9 classes -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Nine answers the map can give</h2>
+        <p>The pipeline uses a <strong>two-level hierarchy</strong>. Level 1 sorts land into 7 broad categories. Level 2 zooms into "Dense Vegetation" and splits it into three forest subtypes.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#2A7B9B">💧</div>
+            <div><strong>1 — Waterbody</strong><p>Lakes, rivers, the Cisokan reservoir — any open water surface</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#D4A843">🌾</div>
+            <div><strong>2 — Paddy</strong><p>Irrigated rice fields — strong NDVI swing between planting and harvest</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#9E9790">🏠</div>
+            <div><strong>3 — Built-up</strong><p>Roads, rooftops, settlements — high brightness across all seasons</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#6B6560">🌫️</div>
+            <div><strong>4 — Others</strong><p>Clouds, shadows, mixed pixels — anything that defies the other labels</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#1a5c35">🌳</div>
+            <div><strong>5 — Natural Forest</strong><p>Old-growth and secondary forest — tallest canopy, highest biomass</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#2D8B55">🌲</div>
+            <div><strong>6 — Production Forest</strong><p>Timber plantations — dense but younger, more uniform canopy</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#5AAD7A">🫖</div>
+            <div><strong>7 — Agroforest</strong><p>Mixed gardens (coffee, rubber, fruit trees) — heterogeneous and hard to classify</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#D4A843">🌿</div>
+            <div><strong>8 — Sparse Vegetation</strong><p>Grassland, shrubs, degraded land — covers 46% of the watershed</p></div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background:#E06B56">🌽</div>
+            <div><strong>9 — Crops</strong><p>Upland agriculture — corn, cassava, mixed annual crops</p></div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why "Bareland" was dropped</strong>
+            <p>Cisokan has very little permanently bare soil — what looked like "Bareland" was mostly transient states (harvested paddy, fallow, cloud shadows). Forcing the model to learn an incoherent class made everything worse. Removing it lifted overall accuracy from 87% to 89.5%.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: Key results up front -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">How well does it work?</h2>
+        <p>Before diving into the machinery, here's the headline: the pipeline achieves <strong>89.5% overall accuracy</strong> for the 7-class L1 map — verified on 228 held-out segments the model never saw during training.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">🎯</div>
+            <h4 class="pattern-title">L1 Accuracy</h4>
+            <p class="pattern-desc">89.5% overall accuracy, 92% in 5-fold cross-validation. Every class reaches F1 ≥ 0.82.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🌲</div>
+            <h4 class="pattern-title">L2 Accuracy</h4>
+            <p class="pattern-desc">57.5% for forest subtypes — harder problem, only 137 training samples. Production forest is the toughest class.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📈</div>
+            <h4 class="pattern-title">Key driver</h4>
+            <p class="pattern-desc">Canopy height data (#1 and #3 most important features) — tree height separates forest from farmland better than any spectral band.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🗺️</div>
+          <div class="callout-content">
+            <strong class="callout-title">What you will learn in this course</strong>
+            <p>Module 2 introduces the 12 scripts. Module 3 unpacks how raw pixels become 591 measurements. Module 4 explains segmentation and the Random Forest. Module 5 shows how to read accuracy numbers and where to improve the model.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-2" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">02</span>
+      <h1 class="module-title">Meet the Cast</h1>
+      <p class="module-subtitle">12 Python scripts, each with a single job — and the three satellite data sources they feed on</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- Screen 1: The scripts as characters -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Think of each script like a specialist on a film crew</h2>
+        <p>No single person on a film set does everything — the director doesn't also operate the camera. Same idea here. Each <span class="term" data-definition="A Python script is a plain text file ending in .py that contains instructions for the computer. You run it by typing &quot;python filename.py&quot; in the terminal.">Python script</span> has one focused responsibility, and they hand work to each other in a clear order.</p>
+        <p>The scripts break into four groups: data downloaders, feature builders, classifiers, and analysis tools.</p>
+
+        <div class="file-tree animate-in">
+          <div class="ft-folder open">
+            <span class="ft-name">Data Download</span>
+            <div class="ft-children">
+              <div class="ft-file"><span class="ft-name">build_sar_features.py</span><span class="ft-desc">Downloads Sentinel-1 + PALSAR-2 from Google Earth Engine</span></div>
+              <div class="ft-file"><span class="ft-name">download_meta_canopy_v2.py</span><span class="ft-desc">Streams canopy height tiles from Meta's public S3 bucket</span></div>
+              <div class="ft-file"><span class="ft-name">ee_init.py</span><span class="ft-desc">Authenticates to Earth Engine — always imported first</span></div>
+            </div>
+          </div>
+          <div class="ft-folder open">
+            <span class="ft-name">Feature Building</span>
+            <div class="ft-children">
+              <div class="ft-file"><span class="ft-name">planetscope_10epoch_local.py</span><span class="ft-desc">Builds the 138-feature pixel cache from PlanetScope images</span></div>
+              <div class="ft-file"><span class="ft-name">curate_samples_for_obia.py</span><span class="ft-desc">Cleans training points — one per segment, no conflicts</span></div>
+            </div>
+          </div>
+          <div class="ft-folder open">
+            <span class="ft-name">Classification</span>
+            <div class="ft-children">
+              <div class="ft-file"><span class="ft-name">planetscope_10epoch_obia_v3.py</span><span class="ft-desc">The main script — runs all 13 pipeline stages end-to-end</span></div>
+            </div>
+          </div>
+          <div class="ft-folder open">
+            <span class="ft-name">SAM Segmentation (alternative)</span>
+            <div class="ft-children">
+              <div class="ft-file"><span class="ft-name">sam_preprocess.py</span><span class="ft-desc">Prepares the RGB input for Meta SAM</span></div>
+              <div class="ft-file"><span class="ft-name">sam_run.py</span><span class="ft-desc">Runs the Segment Anything Model on the AOI</span></div>
+              <div class="ft-file"><span class="ft-name">sam_filter.py</span><span class="ft-desc">Filters and fills SAM polygons</span></div>
+              <div class="ft-file"><span class="ft-name">sam_option_a.py</span><span class="ft-desc">Alternative: uses SAM cut lines to subdivide Dense segments</span></div>
+            </div>
+          </div>
+          <div class="ft-folder open">
+            <span class="ft-name">Analysis &amp; Visualisation</span>
+            <div class="ft-children">
+              <div class="ft-file"><span class="ft-name">separability_plot.py</span><span class="ft-desc">How well-separated are the classes? 3-panel figure.</span></div>
+              <div class="ft-file"><span class="ft-name">spectral_signature_plot.py</span><span class="ft-desc">What does each class look like across 138 features?</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: The three data sources -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Three eyes in the sky</h2>
+        <p>The classifier doesn't rely on a single satellite. It fuses three completely different data types — each one sees something the others can't.</p>
+
+        <div class="icon-rows stagger-children">
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-1)">🌈</div>
+            <div>
+              <strong>PlanetScope SuperDove — 8 optical bands, 3 m resolution</strong>
+              <p>Ten images taken from March 2024 to March 2026. The backbone of the pipeline — tells you how green, wet, or bright each patch is, and how it changes across seasons.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-2)">📡</div>
+            <div>
+              <strong>Sentinel-1 SAR + PALSAR-2 — Radar, sees through clouds</strong>
+              <p>Radar pulses bounce back differently from rough bark versus smooth water versus metal roofs. Works at night and in rain. 19 Sentinel-1 + 5 PALSAR-2 features.</p>
+            </div>
+          </div>
+          <div class="icon-row animate-in">
+            <div class="icon-circle" style="background: var(--color-actor-3)">📏</div>
+            <div>
+              <strong>Canopy Height — Meta v2 + ETH</strong>
+              <p>How tall is the vegetation? A 40 m Natural Forest tree looks nothing like a 3 m shrub. Canopy height is the single most important feature in the whole model.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why radar?</strong>
+            <p><span class="term" data-definition="SAR stands for Synthetic Aperture Radar. Instead of measuring reflected sunlight like a camera, it sends its own radio pulse and measures the echo. Radar waves pass through clouds, making it usable on cloudy days when optical satellites are blind.">SAR</span> sees what optical sensors can't: forest structure. L-band radar (PALSAR-2) actually penetrates the canopy and bounces off trunks, while C-band (Sentinel-1) scatters from leaves and branches. Together they encode biomass information that pure colour cameras can't provide.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: Group chat — scripts talking to each other -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The scripts on game day</h2>
+        <p>On a fresh setup, the scripts run in this order, handing work to each other. Here's how they'd describe it to each other:</p>
+
+        <div class="chat-window" id="chat-module2">
+          <div class="chat-messages">
+            <div class="chat-message" data-msg="0" data-sender="ee" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">EE</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">ee_init.py</span>
+                <p>Earth Engine credentials loaded. Project authenticated. Ready.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="1" data-sender="sar" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">SR</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">build_sar_features.py</span>
+                <p>Downloaded Sentinel-1 (1.6 MB) and PALSAR-2 (5.1 MB) from Earth Engine. Wrote S1_temporal_features.tif and PALSAR_features.tif.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="2" data-sender="meta" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">CH</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">download_meta_canopy_v2.py</span>
+                <p>Streamed canopy height tiles from Meta S3. Wrote avg, stdev, p95, and cover GeoTIFFs at 3 m.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="3" data-sender="local" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-4)">LC</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-4)">planetscope_10epoch_local.py</span>
+                <p>Processed 10 PlanetScope images. Computed NDVI, NDWI, NDBI, EVI per epoch. Wrote 138 feature TIFs to feature_cache/. Also trained a pixel-level RF but that output is legacy only.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="4" data-sender="curate" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">CU</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">curate_samples_for_obia.py</span>
+                <p>Read 862 training points from samples.gpkg. Kept one point per segment, flagged conflicts. Ready: samples_curated.gpkg.</p>
+              </div>
+            </div>
+            <div class="chat-message" data-msg="5" data-sender="main" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-accent)">V3</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-accent)">planetscope_10epoch_obia_v3.py</span>
+                <p>Got it. Segmenting... 316,209 segments found. Computing 591 features per segment... training Random Forest... OA 89.5%. Writing PS_LandCover_OBIA_v3_Final.tif. Done.</p>
+              </div>
+            </div>
+          </div>
+          <div class="chat-typing" id="chat-module2-typing" style="display:none">
+            <div class="chat-avatar" id="chat-module2-typing-avatar" style="background: var(--color-actor-2)">?</div>
+            <div class="chat-typing-dots">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+          </div>
+          <div class="chat-controls">
+            <button class="btn chat-next-btn">Next Message</button>
+            <button class="btn chat-all-btn">Play All</button>
+            <button class="btn chat-reset-btn">Replay</button>
+            <span class="chat-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: The run order quiz -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Put your knowledge to the test</h2>
+        <p>Before moving on, check your understanding of which scripts do what — and when to run them.</p>
+
+        <div class="quiz-container" id="quiz-module2">
+          <div class="quiz-question-block"
+               data-correct="b"
+               data-explanation-right="Exactly. planetscope_10epoch_local.py builds the pixel feature cache that obia_v3.py reads on startup. You only need to re-run it if the source GeoTIFFs change."
+               data-explanation-wrong="Not quite. Think about which script reads the 10 PlanetScope images and computes the per-pixel features that obia_v3 relies on.">
+            <h3 class="quiz-question">You have new PlanetScope images from a fresh download. Which script must you run before the main classifier?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>build_sar_features.py — to refresh SAR data</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>planetscope_10epoch_local.py — to rebuild the pixel feature cache</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>curate_samples_for_obia.py — to re-assign training points</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="c"
+               data-explanation-right="Right. SAR sees forest structure via radar backscatter regardless of cloud cover or sunlight. That is the structural information optical cameras simply cannot measure."
+               data-explanation-wrong="Not this one. Think about what SAR data adds that a colour camera physically cannot provide — regardless of lighting or weather conditions.">
+            <h3 class="quiz-question">Why does the pipeline bother downloading SAR data when PlanetScope already has 8 spectral bands?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>SAR has better spatial resolution at 3 m</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>SAR covers more dates — 19 vs 10 epochs</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>SAR penetrates the canopy and encodes forest structure — something optical light cannot measure</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module2')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module2')">Try Again</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-3" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">03</span>
+      <h1 class="module-title">591 Ways to See a Tree</h1>
+      <p class="module-subtitle">How raw satellite pixels become a 591-column table — one row per forest patch</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- Screen 1: Why 591? -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why does the model need 591 numbers per patch?</h2>
+        <p>A single pixel on a single date tells you very little. A paddy field and a wet dirt road look nearly identical in March. But watch them both across 10 dates, measure their radar response, check how tall the vegetation is — now they diverge completely.</p>
+        <p>The art of this pipeline is turning each 93-pixel segment into a rich "fingerprint" — 591 numbers that describe everything observable about that patch from space.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">🌈</div>
+            <h4 class="pattern-title">138 Legacy Pixel Features</h4>
+            <p class="pattern-desc">8 bands × 10 epochs = 80 raw band means, plus NDVI, NDWI, NDBI, EVI per epoch and temporal summaries. Built by planetscope_10epoch_local.py.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">📐</div>
+            <h4 class="pattern-title">100 New Epoch Indices</h4>
+            <p class="pattern-desc">10 spectral indices (NDRE, EVI2, BSI, OSAVI, VARI, MNDWI, CIG, GNDVI, ARI, SIPI) across all 10 dates. More discriminative than raw bands.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📡</div>
+            <h4 class="pattern-title">48 SAR Features</h4>
+            <p class="pattern-desc">19 Sentinel-1 + 5 PALSAR-2 bands, each with mean and std across the segment = 48 numbers. Radar backscatter encodes canopy roughness and soil moisture.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">📏</div>
+            <h4 class="pattern-title">12 Canopy Height Features</h4>
+            <p class="pattern-desc">Meta v2 (avg, stdev, p95, cover) + ETH (mean, std) — 6 raw × mean + std = 12. The #1 and #3 most important features in the entire model.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">🔲</div>
+            <h4 class="pattern-title">11 Texture + Shape</h4>
+            <p class="pattern-desc">6 texture stats from NDVI/NIR (variance, contrast...) + 5 geometric properties (area, compactness, elongation...) per segment.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: The zonal stats trick -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The zonal stats trick — going from pixels to patches</h2>
+        <p>Think of each segment as a territory on a map. You want to describe that territory — not pixel by pixel, but as a whole. The pipeline uses a clever counting technique called <strong>zonal statistics</strong>.</p>
+        <p>For each of the 316,000 segments and each of ~266 pixel features, it computes two numbers: the <em>mean</em> (typical value inside this territory) and the <em>standard deviation</em> (how varied the values are). That gives 266 × 2 = 532 zonal features.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code>
+<span class="code-line"><span class="code-property">count</span> = np.<span class="code-function">bincount</span>(lbl, minlength=n_seg+<span class="code-number">1</span>)</span>
+<span class="code-line"><span class="code-property">s</span>     = np.<span class="code-function">bincount</span>(lbl, weights=val, minlength=n_seg+<span class="code-number">1</span>)</span>
+<span class="code-line"><span class="code-property">sq</span>    = np.<span class="code-function">bincount</span>(lbl, weights=val*val, minlength=n_seg+<span class="code-number">1</span>)</span>
+<span class="code-line"><span class="code-property">mean</span>  = s / count</span>
+<span class="code-line"><span class="code-property">std</span>   = np.<span class="code-function">sqrt</span>(sq/count - mean**<span class="code-number">2</span>)</span>
+            </code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Count how many pixels live in each segment (like a census)</p>
+              <p class="tl">Sum up all the pixel values inside each segment</p>
+              <p class="tl">Sum up all the squared values (needed to compute spread)</p>
+              <p class="tl">Divide total by count to get the average value per segment</p>
+              <p class="tl">Compute spread: how far individual pixels deviate from the average</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why numpy.bincount instead of a loop?</strong>
+            <p>A loop across 316k segments × 266 features × 93 pixels would take hours. <span class="term" data-definition="numpy is a Python library for fast numerical computation. It operates on entire arrays at once — rather than looping through items one at a time — which makes it 100-1000x faster for large datasets.">numpy.bincount</span> does the same work by accumulating histogram buckets in a single pass over the pixel array. Wall-clock time: ~4 minutes vs multiple hours.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: The spectral indices -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why compute indices instead of just using the raw bands?</h2>
+        <p>Raw reflectance values are sensitive to lighting, atmosphere, and sensor quirks. <span class="term" data-definition="A spectral index is a mathematical ratio of two or more spectral bands that highlights a specific property — like vegetation greenness or water content. Ratios cancel out many sources of noise that affect individual bands.">Spectral indices</span> are ratios that cancel out much of that noise and amplify the signal you care about.</p>
+
+        <div class="badge-list stagger-children animate-in">
+          <div class="badge-item">
+            <code class="badge-code">NDVI</code>
+            <span class="badge-desc">Normalised Difference Vegetation Index — how green and photosynthetically active. The classic.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">NDRE</code>
+            <span class="badge-desc">Red-Edge version of NDVI — more sensitive to canopy chlorophyll, less saturated over dense forest.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">NDWI / MNDWI</code>
+            <span class="badge-desc">Water index — high over water bodies, low over dry soil. Key for separating Paddy from Crops.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">BSI</code>
+            <span class="badge-desc">Bare Soil Index — high over exposed dirt, low over vegetation. Flips with NDVI.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">VARI</code>
+            <span class="badge-desc">Visible Atmospherically Resistant Index — works with RGB only, great for Crops in the March image.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">OSAVI / EVI2</code>
+            <span class="badge-desc">Soil-adjusted vegetation indices — better than NDVI where bare soil shows through sparse canopy.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: Temporal features -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Seasonality is the secret weapon</h2>
+        <p>A single date can be ambiguous — a harvested paddy field and a barren slope look identical in the dry season. But across 10 dates, paddy has a very specific signature: it goes green fast (planting), peaks, then goes brown fast (harvest). Forest stays green year-round.</p>
+        <p>The pipeline computes <strong>temporal summary features</strong> that capture this rhythm:</p>
+
+        <div class="step-cards stagger-children animate-in">
+          <div class="step-card">
+            <div class="step-num">P</div>
+            <div class="step-body">
+              <strong>Percentiles (p10, p25, p50, p75, p90)</strong>
+              <p>The 50th percentile (median) NDVI captures the "typical" greenness ignoring extreme dates. The spread between p10 and p90 captures seasonal swing.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">H</div>
+            <div class="step-body">
+              <strong>Harmonic coefficients (amplitude, offset, phase)</strong>
+              <p>Fit a sinusoidal wave to NDVI across time. Amplitude tells you how much it varies seasonally. Phase tells you when it peaks. Together they fingerprint crop calendars.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">Y</div>
+            <div class="step-body">
+              <strong>Year-over-Year difference</strong>
+              <p>Compare the same month across two years. Stable forest shows near-zero change. Cleared land shows a sudden NDVI drop. This detects disturbance.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🗓️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why September is the most important single date</strong>
+            <p>The feature importance rankings show that September indices (NDBI, NDWI, NDRE, OSAVI, BSI) dominate the top-15 list. September is the dry season — maximum contrast between bare soil, senescent crops, and evergreen forest. Seasonal timing matters as much as spectral range.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 5: DnD matching -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Match the feature to what it detects</h2>
+        <p>Drag each feature group to the land-cover property it is best at detecting.</p>
+
+        <div class="dnd-container" id="dnd-module3">
+          <div class="dnd-chips">
+            <div class="dnd-chip" draggable="true" data-answer="canopy">Canopy Height</div>
+            <div class="dnd-chip" draggable="true" data-answer="radar">PALSAR-2 HV</div>
+            <div class="dnd-chip" draggable="true" data-answer="ndwi">NDWI (water index)</div>
+            <div class="dnd-chip" draggable="true" data-answer="harmonic">Harmonic amplitude</div>
+          </div>
+          <div class="dnd-zones">
+            <div class="dnd-zone" data-correct="canopy">
+              <p class="dnd-zone-label">Separating tall Natural Forest from short shrubs and crops</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="radar">
+              <p class="dnd-zone-label">Penetrating the forest canopy to measure wood volume and biomass</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="ndwi">
+              <p class="dnd-zone-label">Distinguishing open water bodies and flooded paddy fields from dry land</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="harmonic">
+              <p class="dnd-zone-label">Detecting seasonal crop calendars — how much NDVI oscillates across the year</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+          </div>
+          <button class="btn" style="margin-top:1rem" onclick="checkDnD('dnd-module3')">Check Matches</button>
+          <button class="btn" style="margin-top:1rem;margin-left:.5rem" onclick="resetDnD('dnd-module3')">Reset</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-4" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">04</span>
+      <h1 class="module-title">The Thinking Machine</h1>
+      <p class="module-subtitle">How LSMS segmentation draws the borders — and how Random Forest learns to label what's inside them</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- Screen 1: Segmentation explained -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why not just classify pixel by pixel?</h2>
+        <p>The naïve approach would be: for each of the 300 million pixels in the Cisokan image, decide its class. The problem? A single pixel is 3 m × 3 m — about the size of a car. A single pixel of "forest" could easily be a sunlit gap, a shadow, or a branch tip. Noise overwhelms signal.</p>
+        <p><span class="term" data-definition="OBIA stands for Object-Based Image Analysis. Instead of classifying individual pixels, it first groups neighbouring pixels into coherent objects (segments), then classifies each object as a whole. This dramatically reduces noise and allows shape-based features to be computed.">OBIA</span> solves this by first grouping nearby similar pixels into segments — patches of 50–500 pixels that share similar colour, texture, and brightness — then classifying each patch as a unit.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-error)">
+            <div class="pattern-icon" style="background: var(--color-error)">❌</div>
+            <h4 class="pattern-title">Pixel-by-pixel (old way)</h4>
+            <p class="pattern-desc">300M decisions. Each pixel sees only one 3 m square. Noise in a single dark pixel wrongly labels "shadow" as "water." Salt-and-pepper errors everywhere.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">✅</div>
+            <h4 class="pattern-title">Segment-by-segment (OBIA)</h4>
+            <p class="pattern-desc">316k decisions. Each segment sees 93 pixels averaged together. Noise cancels out. You can also compute shape (round vs. elongated) — water is round, roads are thin lines.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: LSMS -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">LSMS: the pixel sorter</h2>
+        <p><span class="term" data-definition="LSMS stands for Large-Scale Mean-Shift. It is an algorithm from the Orfeo Toolbox (OTB) that groups pixels by similarity — not just in colour, but also in spatial proximity. Think of it as letting pixels &quot;migrate&quot; toward their nearest crowd until everyone is in a cluster.">LSMS</span> works like a crowd-sorting algorithm at a festival. Each pixel "walks" toward the nearest cluster of similar-coloured neighbours. After all pixels settle, the groups become segments.</p>
+        <p>Three parameters control how fine-grained the result is:</p>
+
+        <div class="badge-list animate-in">
+          <div class="badge-item">
+            <code class="badge-code">spatialr = 3</code>
+            <span class="badge-desc">Search radius in pixels — how far a pixel looks for similar neighbours. Smaller = finer segments.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">ranger = 12.0</code>
+            <span class="badge-desc">Spectral tolerance — how different two pixels can be and still merge. Lower = more segments.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">minsize = 50</code>
+            <span class="badge-desc">Minimum segment size in pixels. Tiny slivers below this are merged into neighbours.</span>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📏</div>
+          <div class="callout-content">
+            <strong class="callout-title">Fine vs Coarse — a 7.7pp accuracy difference</strong>
+            <p>Early runs used coarse parameters (spatialr=15, ranger=30) producing 60k segments of ~485 pixels each. Tightening to the current fine settings tripled the segment count to 316k, halved pixel-per-segment to 93, doubled the usable training set, and boosted cross-validation accuracy from 81% to 88.7% — with the standard deviation shrinking from ±4.9pp to ±1.7pp (far more stable).</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: The RF config (code translation) -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The Random Forest — a forest that classifies forests</h2>
+        <p>A <span class="term" data-definition="A Random Forest is an ensemble of decision trees — like asking 100 experts the same question and taking a majority vote. Each tree sees a random subset of features and training examples, making the combined vote far more reliable than any single tree.">Random Forest</span> is not one model but an ensemble of 100 decision trees, each independently trained on a random subset of the data. The final prediction is the majority vote across all 100 trees.</p>
+        <p>Here is the exact configuration used in this pipeline:</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code>
+<span class="code-function">RandomForestClassifier</span>(
+  <span class="code-property">n_estimators</span>=<span class="code-number">100</span>,
+  <span class="code-property">min_samples_leaf</span>=<span class="code-number">1</span>,
+  <span class="code-property">max_samples</span>=<span class="code-number">0.5</span>,
+  <span class="code-property">bootstrap</span>=<span class="code-keyword">True</span>,
+  <span class="code-property">max_features</span>=<span class="code-string">"sqrt"</span>,
+  <span class="code-property">random_state</span>=<span class="code-number">42</span>,
+  <span class="code-property">n_jobs</span>=-<span class="code-number">1</span>,
+)
+            </code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Create a committee of 100 decision trees</p>
+              <p class="tl">Each leaf node can represent a single training example (no smoothing)</p>
+              <p class="tl">Each tree only sees 50% of the training data — forces diversity</p>
+              <p class="tl">Sample with replacement (like drawing cards, then putting them back)</p>
+              <p class="tl">Each tree sees a random square-root-sized subset of the 591 features</p>
+              <p class="tl">Fixed randomness — run it twice, get the same result</p>
+              <p class="tl">Use all CPU cores in parallel — faster training</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: The L1→L2 hierarchy -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Two classifiers, two questions</h2>
+        <p>The pipeline runs two Random Forests back to back. Think of it as a two-round interview: the first screener narrows the field, then a specialist makes the final call.</p>
+
+        <div class="flow-steps animate-in">
+          <div class="flow-step">
+            <div class="flow-step-num">L1</div>
+            <p>7 broad classes — Waterbody, Paddy, Built-up, Others, Dense Vegetation, Sparse Vegetation, Crops</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <div class="flow-step-num">🌳</div>
+            <p>All "Dense Vegetation" segments get handed to L2</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <div class="flow-step-num">L2</div>
+            <p>3 forest subtypes — Natural Forest, Production Forest, Agroforest</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <div class="flow-step-num">9</div>
+            <p>Final map merges L1 + L2 into a 9-class hierarchical raster</p>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">The v2 labeling bug that caused a 24pp accuracy drop</strong>
+            <p>An earlier version of the pipeline (v2) expanded each training point into a weighted row and assigned fractional labels per segment. This created cross-split contamination — the same segment appeared in both training and validation splits with different labels. The v1 strict majority-vote scheme (used in v3) avoids this entirely. Lesson: always check your train/validation split for data leakage.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 5: Quiz -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Debugging the classifier</h2>
+        <p>You've deployed the model. A colleague reports that Natural Forest segments are frequently mislabelled as Production Forest. Apply what you've learned to diagnose the issue.</p>
+
+        <div class="quiz-container" id="quiz-module4">
+          <div class="quiz-question-block"
+               data-correct="b"
+               data-explanation-right="Correct. The L2 confusion matrix in the results shows that 7 of 14 Production Forest segments are classified as Natural Forest. Both classes have tall, dense canopy — the structural features (canopy height spread, SAR backscatter) that should separate them are present but there are too few Production training rows for the model to learn the management-cycle pattern reliably."
+               data-explanation-wrong="Not quite. The L1 accuracy for Dense Vegetation is 83% F1, which is acceptable. The mislabelling between Natural and Production happens inside L2 — the second-stage classifier. Look at which classes are in scope for L2.">
+            <h3 class="quiz-question">Natural Forest and Production Forest are both "Dense Vegetation" in the L1 model. Where does the confusion actually happen?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>In L1 — the first classifier is confusing Dense Vegetation with other classes</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>In L2 — the forest-subtype classifier doesn't have enough Production training samples</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>In the segmentation — LSMS is merging Natural and Production pixels into the same segment</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="c"
+               data-explanation-right="Right. Adding 30-50 unambiguous Production Forest training samples (look for planting rows in satellite basemap) is the highest-value action. The model has the right features — it just hasn&apos;t seen enough examples of what Production Forest looks like."
+               data-explanation-wrong="Not the best answer. Re-running segmentation won&apos;t help — the L2 classifier already gets all Dense Vegetation segments. The root cause is insufficient training data, not a bad segmentation.">
+            <h3 class="quiz-question">What is the single highest-value action to improve Production Forest classification?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Re-run segmentation with finer LSMS parameters to split forest patches</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Add more spectral indices — the model needs more features to discriminate</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Collect 30-50 more Production Forest training points — planting rows visible in satellite basemap</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module4')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module4')">Try Again</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+<section class="module" id="module-5" style="background: var(--color-bg)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">05</span>
+      <h1 class="module-title">Reading the Numbers</h1>
+      <p class="module-subtitle">What accuracy metrics actually tell you — and how to use feature importance to improve the model</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- Screen 1: OA, Kappa -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Overall Accuracy and Kappa — what the headline numbers mean</h2>
+        <p>After training, the pipeline withholds 30% of labeled segments for a final exam — segments the model never saw during training. It predicts the class for each, then compares to the ground truth labels.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">🎯</div>
+            <h4 class="pattern-title">Overall Accuracy (OA)</h4>
+            <p class="pattern-desc">Percentage of validation segments classified correctly. 89.5% means 9 out of 10 unseen patches got the right label. Intuitive, but misleading if classes are unbalanced.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📊</div>
+            <h4 class="pattern-title">Cohen&apos;s Kappa</h4>
+            <p class="pattern-desc">Kappa adjusts OA for chance agreement. If a model just predicted "Sparse Vegetation" for everything, it would get 46% OA for free. Kappa penalises that. 0.875 kappa is excellent.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🔁</div>
+            <h4 class="pattern-title">5-Fold Cross-Validation</h4>
+            <p class="pattern-desc">Repeat the train/test split 5 times with different partitions. The mean (92.0%) and std deviation (±1.6%) together tell you: "this model is both accurate and stable."</p>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">CV standard deviation is more important than you think</strong>
+            <p>The coarse-segmentation model had CV OA of 81% ± 4.9pp. The fine model: 88.7% ± 1.7pp. The mean improved, but the standard deviation shrinking by 3x matters more for production — it means the model is consistent across different data splits, not just lucky on one.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: F1 score per class -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">F1 Score — the per-class honest grade</h2>
+        <p>Overall accuracy hides class-level failures. <span class="term" data-definition="F1 score is the harmonic mean of Precision (how often your positive predictions are right) and Recall (how many of the true positives you found). A score of 1.0 is perfect; 0.0 is useless. It punishes both false alarms and misses equally.">F1 score</span> catches them: a class with F1 = 0.50 is getting half its predictions wrong, even if OA looks fine.</p>
+
+        <div class="badge-list stagger-children animate-in">
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-accent)">Others: 0.97</code>
+            <span class="badge-desc">The catch-all class — very consistent because anything ambiguous gets sent here</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-actor-2)">Built-up: 0.90</code>
+            <span class="badge-desc">Roofs and roads have a unique spectral + radar signature — high confidence</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-actor-2)">Paddy: 0.89</code>
+            <span class="badge-desc">Strong seasonal NDWI cycle makes paddy distinctive</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-actor-2)">Waterbody: 0.93</code>
+            <span class="badge-desc">Water is spectrally unique — very low reflectance across all bands</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-actor-4)">Crops: 0.91</code>
+            <span class="badge-desc">+0.24 vs the coarse model — finer segments broke apart crop/sparse confusion</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-actor-4)">Sparse Vegetation: 0.82</code>
+            <span class="badge-desc">+0.25 vs coarse — biggest single improvement from fine segmentation</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code" style="color: var(--color-actor-5)">Dense Vegetation: 0.83</code>
+            <span class="badge-desc">L1 correct — subtypes then handled at L2 with a separate RF</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: Feature importance -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">What the model actually learned to look at</h2>
+        <p><span class="term" data-definition="Feature importance in a Random Forest measures how much each input variable helps reduce prediction error across all 100 trees. Higher importance = that feature caused more correct splits. All importances sum to 1.0.">Feature importance</span> is like a spotlight on the model's attention. After training, you can ask: "Out of 591 features, which ones did the trees lean on most?" The answers are surprising — and actionable.</p>
+
+        <div class="step-cards stagger-children animate-in">
+          <div class="step-card">
+            <div class="step-num">#1</div>
+            <div class="step-body">
+              <strong>tree_height_mean__mean (0.0192)</strong>
+              <p>How tall is the canopy on average across this segment? Nothing separates 40 m natural forest from 1 m crops faster than this single number.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">#2</div>
+            <div class="step-body">
+              <strong>ampNDBI__mean (0.0133) — seasonal amplitude of Bare Soil Index</strong>
+              <p>How much does the bare soil signal swing across the year? Forest stays stable. Crops go from bare to vegetated and back. This rhythm is the key to separating them.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">#3</div>
+            <div class="step-body">
+              <strong>tree_height_std__mean (0.0128)</strong>
+              <p>How variable is the canopy height within this segment? A uniform plantation has low std. Mixed natural forest with gaps has high std. This discriminates forest subtypes.</p>
+            </div>
+          </div>
+          <div class="step-card">
+            <div class="step-num">#5</div>
+            <div class="step-body">
+              <strong>PALSAR_HV_db__mean (0.0121) — L-band radar cross-polarisation</strong>
+              <p>L-band radar penetrates the canopy and bounces off woody trunks. High HV = dense woody biomass. This is structural information no optical band can provide.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">The top 20 features match the full 591</strong>
+            <p>The Top-20 model achieves identical accuracy to the full-feature model. This is a sign of feature saturation — once segments are homogeneous enough (fine LSMS), the top 20 features capture everything the model needs. You could deploy a 20-feature model 30x faster with no accuracy cost.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: The L2 problem and how to fix it -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The L2 problem — and the path to fixing it</h2>
+        <p>The L2 forest-subtype classifier achieves 57.5% accuracy on 40 validation segments. The dominant failure mode: 7 of 14 Production Forest segments get labelled as Natural Forest.</p>
+        <p>Here's the full confusion matrix:</p>
+
+        <div style="overflow-x:auto; margin: var(--space-6) 0;">
+          <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:var(--text-sm)">
+            <thead>
+              <tr style="background:var(--color-bg-code);color:#CDD6F4">
+                <th style="padding:var(--space-3);text-align:left"></th>
+                <th style="padding:var(--space-3);text-align:center">Pred. Natural</th>
+                <th style="padding:var(--space-3);text-align:center">Pred. Production</th>
+                <th style="padding:var(--space-3);text-align:center">Pred. Agroforest</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="background:var(--color-surface)">
+                <td style="padding:var(--space-3);font-weight:600">True Natural (n=18)</td>
+                <td style="padding:var(--space-3);text-align:center;color:var(--color-accent);font-weight:700">11</td>
+                <td style="padding:var(--space-3);text-align:center">5</td>
+                <td style="padding:var(--space-3);text-align:center">2</td>
+              </tr>
+              <tr style="background:var(--color-bg-warm)">
+                <td style="padding:var(--space-3);font-weight:600">True Production (n=14)</td>
+                <td style="padding:var(--space-3);text-align:center;color:var(--color-error);font-weight:700">7</td>
+                <td style="padding:var(--space-3);text-align:center;color:var(--color-accent)">7</td>
+                <td style="padding:var(--space-3);text-align:center">0</td>
+              </tr>
+              <tr style="background:var(--color-surface)">
+                <td style="padding:var(--space-3);font-weight:600">True Agroforest (n=8)</td>
+                <td style="padding:var(--space-3);text-align:center">1</td>
+                <td style="padding:var(--space-3);text-align:center">2</td>
+                <td style="padding:var(--space-3);text-align:center;color:var(--color-accent);font-weight:700">5</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>Production Forest and Natural Forest both have tall, dense canopy. The features that should separate them — <code style="background:var(--color-bg-code);color:#CBA6F7;padding:2px 6px;border-radius:4px">tree_height_std</code>, <code style="background:var(--color-bg-code);color:#CBA6F7;padding:2px 6px;border-radius:4px">S1_VV_stdDev</code> — are present, but the model has only 48 Production training examples to learn from. The fix is straightforward: collect 30–50 more Production Forest training points from areas where planting rows are visible in the satellite basemap.</p>
+      </section>
+
+      <!-- Screen 5: Final quiz — applying it all -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Final challenge — reading a real scenario</h2>
+
+        <div class="quiz-container" id="quiz-module5">
+          <div class="quiz-question-block"
+               data-correct="b"
+               data-explanation-right="Exactly. Cross-validation OA of 64.9% ± 7.6% tells you the model works but is unstable — the ±7.6pp standard deviation means one fold scored 57% and another scored 73%, which are effectively different models. That instability points to insufficient training data (137 samples across 3 classes is thin). More samples = more stable folds."
+               data-explanation-wrong="Not the strongest answer. The OA alone doesn&apos;t reveal the problem. The key signal is the high standard deviation in CV OA (±7.6pp) — a stable, well-trained model has much smaller variation across folds.">
+            <h3 class="quiz-question">The L2 model reports CV OA of 64.9% ± 7.6%. A colleague says "64.9% is decent." What does the ±7.6% tell you that they're missing?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>That the model is overfitting — it memorised training data but fails on new data</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>That the model is unstable — accuracy swings 15pp between folds, signalling too few training samples</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>That the model is underfitting — it needs more features to discriminate the classes</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="a"
+               data-explanation-right="Right. The feature importance table shows tree_height_mean and tree_height_std are #1 and #3. With Meta v2 canopy height included, L2 Holdout OA jumps from 57.5% to 62.5% — a 5pp gain from just 8 new features. The dataset is the bottleneck, and richer data beats more complex models at this sample size."
+               data-explanation-wrong="Not quite. The model architecture (n_estimators, max_features) is already well-tuned for this dataset size. The bottleneck is data quality and quantity — which points toward better canopy height data or more training samples, not hyperparameter tuning.">
+            <h3 class="quiz-question">You want to improve L2 accuracy without collecting more training points. Which action would have the largest impact?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Add higher-resolution canopy height data — it is the #1 and #3 most important feature in the model</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Increase n_estimators from 100 to 500 — more trees means better ensemble averaging</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Switch from Random Forest to XGBoost — a more powerful algorithm</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module5')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module5')">Try Again</button>
+        </div>
+
+        <div class="callout callout-info" style="margin-top: var(--space-8)">
+          <div class="callout-icon">🚀</div>
+          <div class="callout-content">
+            <strong class="callout-title">Next steps for this pipeline</strong>
+            <p>1) Add 30–50 Production Forest training samples. 2) Investigate why 46% of the AOI is Sparse Vegetation — some may be misclassified Agroforest fringe. 3) Test the YRF (Young Regenerated Forest) rule with dedicated samples. 4) Consider fine-scale SAR at 10 m for the L2 model once the training set is larger.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+  </main>
+
+</body>
+</html>

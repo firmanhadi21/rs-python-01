@@ -1,0 +1,190 @@
+<section class="module" id="module-4" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+    <header class="module-header animate-in">
+      <span class="module-number">04</span>
+      <h1 class="module-title">The Thinking Machine</h1>
+      <p class="module-subtitle">How LSMS segmentation draws the borders — and how Random Forest learns to label what's inside them</p>
+    </header>
+
+    <div class="module-body">
+
+      <!-- Screen 1: Segmentation explained -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why not just classify pixel by pixel?</h2>
+        <p>The naïve approach would be: for each of the 300 million pixels in the Cisokan image, decide its class. The problem? A single pixel is 3 m × 3 m — about the size of a car. A single pixel of "forest" could easily be a sunlit gap, a shadow, or a branch tip. Noise overwhelms signal.</p>
+        <p><span class="term" data-definition="OBIA stands for Object-Based Image Analysis. Instead of classifying individual pixels, it first groups neighbouring pixels into coherent objects (segments), then classifies each object as a whole. This dramatically reduces noise and allows shape-based features to be computed.">OBIA</span> solves this by first grouping nearby similar pixels into segments — patches of 50–500 pixels that share similar colour, texture, and brightness — then classifying each patch as a unit.</p>
+
+        <div class="pattern-cards stagger-children">
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-error)">
+            <div class="pattern-icon" style="background: var(--color-error)">❌</div>
+            <h4 class="pattern-title">Pixel-by-pixel (old way)</h4>
+            <p class="pattern-desc">300M decisions. Each pixel sees only one 3 m square. Noise in a single dark pixel wrongly labels "shadow" as "water." Salt-and-pepper errors everywhere.</p>
+          </div>
+          <div class="pattern-card animate-in" style="border-top-color: var(--color-accent)">
+            <div class="pattern-icon" style="background: var(--color-accent)">✅</div>
+            <h4 class="pattern-title">Segment-by-segment (OBIA)</h4>
+            <p class="pattern-desc">316k decisions. Each segment sees 93 pixels averaged together. Noise cancels out. You can also compute shape (round vs. elongated) — water is round, roads are thin lines.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 2: LSMS -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">LSMS: the pixel sorter</h2>
+        <p><span class="term" data-definition="LSMS stands for Large-Scale Mean-Shift. It is an algorithm from the Orfeo Toolbox (OTB) that groups pixels by similarity — not just in colour, but also in spatial proximity. Think of it as letting pixels &quot;migrate&quot; toward their nearest crowd until everyone is in a cluster.">LSMS</span> works like a crowd-sorting algorithm at a festival. Each pixel "walks" toward the nearest cluster of similar-coloured neighbours. After all pixels settle, the groups become segments.</p>
+        <p>Three parameters control how fine-grained the result is:</p>
+
+        <div class="badge-list animate-in">
+          <div class="badge-item">
+            <code class="badge-code">spatialr = 3</code>
+            <span class="badge-desc">Search radius in pixels — how far a pixel looks for similar neighbours. Smaller = finer segments.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">ranger = 12.0</code>
+            <span class="badge-desc">Spectral tolerance — how different two pixels can be and still merge. Lower = more segments.</span>
+          </div>
+          <div class="badge-item">
+            <code class="badge-code">minsize = 50</code>
+            <span class="badge-desc">Minimum segment size in pixels. Tiny slivers below this are merged into neighbours.</span>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📏</div>
+          <div class="callout-content">
+            <strong class="callout-title">Fine vs Coarse — a 7.7pp accuracy difference</strong>
+            <p>Early runs used coarse parameters (spatialr=15, ranger=30) producing 60k segments of ~485 pixels each. Tightening to the current fine settings tripled the segment count to 316k, halved pixel-per-segment to 93, doubled the usable training set, and boosted cross-validation accuracy from 81% to 88.7% — with the standard deviation shrinking from ±4.9pp to ±1.7pp (far more stable).</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 3: The RF config (code translation) -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The Random Forest — a forest that classifies forests</h2>
+        <p>A <span class="term" data-definition="A Random Forest is an ensemble of decision trees — like asking 100 experts the same question and taking a majority vote. Each tree sees a random subset of features and training examples, making the combined vote far more reliable than any single tree.">Random Forest</span> is not one model but an ensemble of 100 decision trees, each independently trained on a random subset of the data. The final prediction is the majority vote across all 100 trees.</p>
+        <p>Here is the exact configuration used in this pipeline:</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE</span>
+            <pre><code>
+<span class="code-function">RandomForestClassifier</span>(
+  <span class="code-property">n_estimators</span>=<span class="code-number">100</span>,
+  <span class="code-property">min_samples_leaf</span>=<span class="code-number">1</span>,
+  <span class="code-property">max_samples</span>=<span class="code-number">0.5</span>,
+  <span class="code-property">bootstrap</span>=<span class="code-keyword">True</span>,
+  <span class="code-property">max_features</span>=<span class="code-string">"sqrt"</span>,
+  <span class="code-property">random_state</span>=<span class="code-number">42</span>,
+  <span class="code-property">n_jobs</span>=-<span class="code-number">1</span>,
+)
+            </code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Create a committee of 100 decision trees</p>
+              <p class="tl">Each leaf node can represent a single training example (no smoothing)</p>
+              <p class="tl">Each tree only sees 50% of the training data — forces diversity</p>
+              <p class="tl">Sample with replacement (like drawing cards, then putting them back)</p>
+              <p class="tl">Each tree sees a random square-root-sized subset of the 591 features</p>
+              <p class="tl">Fixed randomness — run it twice, get the same result</p>
+              <p class="tl">Use all CPU cores in parallel — faster training</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 4: The L1→L2 hierarchy -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Two classifiers, two questions</h2>
+        <p>The pipeline runs two Random Forests back to back. Think of it as a two-round interview: the first screener narrows the field, then a specialist makes the final call.</p>
+
+        <div class="flow-steps animate-in">
+          <div class="flow-step">
+            <div class="flow-step-num">L1</div>
+            <p>7 broad classes — Waterbody, Paddy, Built-up, Others, Dense Vegetation, Sparse Vegetation, Crops</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <div class="flow-step-num">🌳</div>
+            <p>All "Dense Vegetation" segments get handed to L2</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <div class="flow-step-num">L2</div>
+            <p>3 forest subtypes — Natural Forest, Production Forest, Agroforest</p>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-step">
+            <div class="flow-step-num">9</div>
+            <p>Final map merges L1 + L2 into a 9-class hierarchical raster</p>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">The v2 labeling bug that caused a 24pp accuracy drop</strong>
+            <p>An earlier version of the pipeline (v2) expanded each training point into a weighted row and assigned fractional labels per segment. This created cross-split contamination — the same segment appeared in both training and validation splits with different labels. The v1 strict majority-vote scheme (used in v3) avoids this entirely. Lesson: always check your train/validation split for data leakage.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Screen 5: Quiz -->
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Debugging the classifier</h2>
+        <p>You've deployed the model. A colleague reports that Natural Forest segments are frequently mislabelled as Production Forest. Apply what you've learned to diagnose the issue.</p>
+
+        <div class="quiz-container" id="quiz-module4">
+          <div class="quiz-question-block"
+               data-correct="b"
+               data-explanation-right="Correct. The L2 confusion matrix in the results shows that 7 of 14 Production Forest segments are classified as Natural Forest. Both classes have tall, dense canopy — the structural features (canopy height spread, SAR backscatter) that should separate them are present but there are too few Production training rows for the model to learn the management-cycle pattern reliably."
+               data-explanation-wrong="Not quite. The L1 accuracy for Dense Vegetation is 83% F1, which is acceptable. The mislabelling between Natural and Production happens inside L2 — the second-stage classifier. Look at which classes are in scope for L2.">
+            <h3 class="quiz-question">Natural Forest and Production Forest are both "Dense Vegetation" in the L1 model. Where does the confusion actually happen?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>In L1 — the first classifier is confusing Dense Vegetation with other classes</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>In L2 — the forest-subtype classifier doesn't have enough Production training samples</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>In the segmentation — LSMS is merging Natural and Production pixels into the same segment</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="c"
+               data-explanation-right="Right. Adding 30-50 unambiguous Production Forest training samples (look for planting rows in satellite basemap) is the highest-value action. The model has the right features — it just hasn&apos;t seen enough examples of what Production Forest looks like."
+               data-explanation-wrong="Not the best answer. Re-running segmentation won&apos;t help — the L2 classifier already gets all Dense Vegetation segments. The root cause is insufficient training data, not a bad segmentation.">
+            <h3 class="quiz-question">What is the single highest-value action to improve Production Forest classification?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Re-run segmentation with finer LSMS parameters to split forest patches</span>
+              </button>
+              <button class="quiz-option" data-value="b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Add more spectral indices — the model needs more features to discriminate</span>
+              </button>
+              <button class="quiz-option" data-value="c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Collect 30-50 more Production Forest training points — planting rows visible in satellite basemap</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="quiz-check-btn" onclick="checkQuiz('quiz-module4')">Check Answers</button>
+          <button class="quiz-reset-btn" onclick="resetQuiz('quiz-module4')">Try Again</button>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
