@@ -1,0 +1,132 @@
+# Data Sources
+
+## PlanetScope SuperDove
+
+The primary imagery source is PlanetScope SuperDove at 3 m resolution. Ten epochs spanning two years bracket the full seasonal cycle for West Java: two dry-season and two wet-season composites per year, plus transition dates.
+
+| Label | Date | DOY | Season |
+|-------|------|-----|--------|
+| `march` | 21 Mar 2024 | 81 | Late wet |
+| `june` | 30 Jun 2024 | 182 | Early dry |
+| `aug` | 5 Aug 2024 | 218 | Dry |
+| `sept` | 16 Sep 2024 | 260 | Dry |
+| `jan25` | 10 Jan 2025 | 10 | Wet |
+| `may25` | 5 May 2025 | 125 | Early dry |
+| `aug25` | 15 Aug 2025 | 227 | Dry |
+| `sep25` | 7 Sep 2025 | 250 | Dry |
+| `nov25` | 24 Nov 2025 | 328 | Early wet |
+| `mar26` | 17 Mar 2026 | 76 | Late wet |
+
+SuperDove provides 8 spectral bands:
+
+| Band | Name |
+|------|------|
+| 1 | Coastal Blue |
+| 2 | Blue |
+| 3 | Green I |
+| 4 | Green |
+| 5 | Yellow |
+| 6 | Red |
+| 7 | Red Edge |
+| 8 | NIR |
+
+The red edge (band 7) is the key addition over older PlanetScope sensors — it enables vegetation indices such as NDRE and CIre that are more sensitive to canopy chlorophyll content than NDVI alone.
+
+## Sentinel-1 SAR
+
+Sentinel-1 GRD imagery from ESA Copernicus, accessed via Earth Engine:
+
+- **Collection:** `COPERNICUS/S1_GRD`
+- **Mode:** Interferometric Wide (IW), descending orbit
+- **Polarizations:** VV and VH
+- **Window:** 2024-03-01 to 2026-03-31 (brackets the PlanetScope stack)
+- **Scale:** exported at 30 m
+
+Raw images are in linear sigma0 units. Non-positive values (common for VH in dense canopy and water) are clamped to 1e-10 before the log10 conversion so that all exported pixels are finite:
+
+```python
+img.max(1e-10).log10().multiply(10)
+```
+
+Without this clamp, the EE `mean()` reducer propagates nodata masks and the exported GeoTIFF can be almost entirely empty (observed: 0.2% finite VH pixels before the fix).
+
+### S1 feature bands (19 total)
+
+| Band | Description |
+|------|-------------|
+| `VV_mean`, `VH_mean` | Temporal mean (dB) |
+| `VV_stdDev`, `VH_stdDev` | Temporal standard deviation |
+| `VV_min`, `VH_min` | Temporal minimum |
+| `VV_max`, `VH_max` | Temporal maximum |
+| `VV_CV`, `VH_CV` | Coefficient of variation |
+| `VV_wet`, `VH_wet` | Wet-season mean (Nov–Mar) |
+| `VV_dry`, `VH_dry` | Dry-season mean (Apr–Oct) |
+| `VV_seasonal_diff`, `VH_seasonal_diff` | Wet minus dry |
+| `VV_VH_ratio` | VV − VH (dB) |
+| `RVI_S1` | Radar Vegetation Index |
+| `DPSVI_S1` | Dual-Polarization SAR Vegetation Index |
+
+## PALSAR-2
+
+ALOS-2 PALSAR-2 L-band yearly mosaic from JAXA, accessed via Earth Engine:
+
+- **Asset:** `JAXA/ALOS/PALSAR/YEARLY/SAR`
+- **Bands:** HH and HV (DN, uint16)
+- **Year:** auto-probed 2024 → 2017; **2020** selected for this AOI (most recent published year as of 2026-05)
+- **Scale:** exported at 30 m
+
+DN is converted to sigma0 (dB): `20 × log10(DN) − 83`.
+
+### PALSAR feature bands (5 total)
+
+| Band | Description |
+|------|-------------|
+| `HH_db` | HH backscatter (dB) |
+| `HV_db` | HV backscatter (dB) |
+| `HH_HV_ratio` | HH − HV (dB) |
+| `RVI_PALSAR` | Radar Vegetation Index |
+| `DPSVI_PALSAR` | Dual-Polarization SAR Vegetation Index |
+
+HV_db ranked #5 in overall feature importance — L-band penetrates dense canopy and carries structural information (biomass, canopy height) that C-band cannot resolve.
+
+## Canopy height
+
+### ETH 2020 (10 m)
+
+Global canopy height from [Lang et al. 2022](https://www.nature.com/articles/s41559-022-01810-1), distributed via Earth Engine (`users/nlang/ETH_GlobalCanopyHeight_2020_10m_v1`). Provides `tree_height_mean` and `tree_height_std` within a 30 m focal window — two features in the pixel cache.
+
+### Meta Data-for-Good v2 (~28 m source, 3 m output)
+
+Higher-level aggregated canopy statistics from Meta's Data-for-Good program, streamed anonymously from S3 (`dataforgood-fb-data`). Downloaded by `download_meta_canopy_v2.py` and reprojected to EPSG:32748 at 3 m.
+
+| Statistic | Units | Description |
+|-----------|-------|-------------|
+| `avg` | metres | Mean canopy height |
+| `stdev` | metres | Height standard deviation |
+| `p95` | metres | 95th-percentile height (emergents) |
+| `cover` | fraction | Canopy cover fraction |
+
+These 4 layers → 8 segment features (mean + std each). They ranked **highest per-feature importance** in the full 599-feature stack — beating every spectral, temporal, and SAR feature individually. `meta_canopy_p95__mean` and `meta_canopy_avg__mean` are the top two overall features.
+
+**Source encoding:** raw uint16 values use centimetres (heights) and per-mille (cover); 65535 is the nodata sentinel. `download_meta_canopy_v2.py` masks and rescales to natural units before writing.
+
+## Training samples
+
+`samples.gpkg` contains point features digitised by photo-interpretation over PlanetScope imagery and cross-checked with QGIS Wayback:
+
+| Column | Values | Used by |
+|--------|--------|---------|
+| `class` | 1–7 (integer) | L1 classifier |
+| `class_l2` | `Natural`, `Production`, `Agroforest` (string) | L2 classifier |
+
+Points with `class = 5` (Dense Vegetation) and a non-null `class_l2` serve double duty: they train L1 as Dense Vegetation and train L2 for the forest subtype split.
+
+### L2 sample targets
+
+Aim for ≥30 photo-interpretable polygons per L2 subclass. Interpretive cues:
+
+| Subtype | Canopy height | Height stdev | Other cues |
+|---------|--------------|--------------|------------|
+| Natural Forest | >20 m, patchy emergents | High | Irregular crown texture, no rows, on slopes |
+| Production Forest | 15–25 m, uniform | **Low** | Rectilinear blocks, visible roads, occasional clearfells in time series |
+| Agroforest | 8–18 m, mixed | Medium | Near settlements, more NDVI variation across epochs |

@@ -1,0 +1,145 @@
+# Feature Engineering
+
+The pipeline assembles 591 features per segment. Features fall into two categories: **pixel features** (computed at the raster level, then summarised per segment as mean + std) and **segment-only features** (computed directly from segment geometry or label raster).
+
+## Feature summary
+
+| Group | Features | Type |
+|-------|----------|------|
+| Spectral bands (8 bands × 10 epochs) | 80 | Pixel |
+| Legacy indices (NDVI/NDWI/NDBI/EVI × 10 epochs) | 40 | Pixel |
+| Temporal summaries (max/min/std/amp × 4 indices) | 16 | Pixel |
+| Tree height ETH (mean + std within 30 m) | 2 | Pixel |
+| New per-epoch indices (10 indices × 10 epochs) | 100 | Pixel |
+| Temporal percentiles (p10/p50/p90 × 4 indices) | 12 | Pixel |
+| Harmonic fit (amp/phase/offset × 4 indices) | 12 | Pixel |
+| Year-over-year delta (March 2024 → March 2026 × 4 indices) | 4 | Pixel |
+| Texture (entropy, range, CV, MAD of NDVI/NIR) | 6 | Segment |
+| Shape (area, perimeter, compactness, elongation, fill) | 5 | Segment |
+| Sentinel-1 SAR (19 bands × mean + std) | 38 | Pixel |
+| PALSAR-2 (5 bands × mean + std) | 10 | Pixel |
+| Meta v2 canopy (4 statistics × mean + std) | 8 | Pixel |
+| **Total** | **591** | |
+
+## Legacy pixel cache (138 features)
+
+Built by `planetscope_10epoch_local.py`. For each of the 10 epochs:
+
+- 8 raw spectral bands (`{epoch}_b1` … `{epoch}_b8`)
+- 4 spectral indices: NDVI, NDWI, NDBI, EVI
+
+Plus temporal summary statistics across all 10 epochs (4 indices × 4 stats = 16 features):
+
+```
+max{index}, min{index}, std{index}, amp{index}
+```
+
+And 2 ETH canopy height features: `tree_height_mean`, `tree_height_std`.
+
+**Band mapping (legacy):** the legacy pixel script treats `b2=Blue, b3=Green_I, b4=Red, b6=Red, b8=NIR`. The v3 extension uses the full SuperDove mapping for new indices only; legacy features are unchanged to preserve reproducibility.
+
+## New per-epoch indices (100 features)
+
+Computed by `planetscope_10epoch_obia_v3.py` using the full SuperDove band set. 10 new indices per epoch × 10 epochs = 100 features:
+
+| Index | Formula | Sensitivity |
+|-------|---------|-------------|
+| NDRE | (NIR − RedEdge) / (NIR + RedEdge) | Canopy chlorophyll |
+| CIre | NIR / RedEdge − 1 | Chlorophyll index |
+| RENDVI | (RedEdge − Red) / (RedEdge + Red) | Early stress detection |
+| SAVI | (NIR − Red)(1 + L) / (NIR + Red + L), L=0.5 | Bare-soil adjusted |
+| OSAVI | (NIR − Red) / (NIR + Red + 0.16) | Open canopy |
+| MSAVI2 | 0.5 × (2NIR + 1 − √((2NIR+1)² − 8(NIR−Red))) | Minimised soil effect |
+| GNDVI | (NIR − Green) / (NIR + Green) | Canopy greenness |
+| ARVI | (NIR − (2Red − Blue)) / (NIR + (2Red − Blue)) | Atmospheric resistant |
+| VARI | (Green − Red) / (Green + Red − Blue) | Visible atmosphere resistant |
+| BSI | ((Yellow + Red) − (NIR + Blue)) / ((Yellow + Red) + (NIR + Blue)) | Bare soil (no SWIR; Yellow substitutes) |
+
+Results are cached as single-band GeoTIFFs in `outputs_10epoch_obia_v3/feature_cache_v3/`. First run: ~45 sec/epoch. Subsequent runs: instant cache hit.
+
+## Temporal features (28 features)
+
+Derived across the 10-epoch time series for four curated indices: NDVI, EVI, NDRE, GNDVI.
+
+### Percentiles (12 features)
+
+Per-pixel p10, p50, p90 across the 10 epochs. Robust to outliers from cloud shadow or missing acquisitions:
+
+```
+p10{index}, p50{index}, p90{index}
+```
+
+### Harmonic fit (12 features)
+
+Fits a one-term Fourier model per pixel:
+
+```
+y = a0 + a1·cos(2π·DOY/365) + b1·sin(2π·DOY/365)
+```
+
+Three derived features per index: amplitude (`√(a1² + b1²)`), phase (`arctan2(b1, a1)`), and offset (`a0`). The amplitude captures the magnitude of seasonal greenness variation; the offset is the mean greenness level.
+
+```
+harmAmp{index}, harmPhase{index}, harmOffset{index}
+```
+
+`harmOffsetNDVI` ranked #10 and `ampNDVI` ranked #4 in the top-15 feature importance list — showing that seasonality structure is more informative than any single-date observation.
+
+### Year-over-year delta (4 features)
+
+March 2024 → March 2026 pixel-wise difference for each curated index. Captures land-cover change and phenological shift over the two-year observation window:
+
+```
+yoy{index}_mar26_mar24
+```
+
+## Texture features (6 segment-level)
+
+Computed on the temporal-median NDVI and NIR images (not per-epoch, to avoid dominance by any single date):
+
+| Feature | Description |
+|---------|-------------|
+| `entropyNDVI__seg` | Shannon entropy of the NDVI histogram within the segment |
+| `entropyNIR__seg` | Shannon entropy of the NIR histogram within the segment |
+| `rangeNDVI__seg` | p90 − p10 range of NDVI pixels within the segment |
+| `rangeNIR__seg` | p90 − p10 range of NIR pixels within the segment |
+| `cvNDVI__seg` | Coefficient of variation of NDVI within the segment |
+| `madNDVI__seg` | Mean absolute deviation of NDVI within the segment |
+
+High entropy and range indicate heterogeneous vegetation (e.g. agroforest edges), while low values indicate uniform canopy (e.g. paddy, water).
+
+### Note on Haralick GLCM textures
+
+Haralick GLCM textures (OTB `otbcli_HaralickTextureExtraction`) were tested on 2026-05-03 and **disabled**. The hypothesis was that planting-row periodicity in production forest would appear as high ASM/energy at a 1-pixel (~3 m) offset. In practice, the temporal-median composite smoothed away the spatial pattern, and the 32 extra features dropped L2 CV OA from 0.65 to 0.61 (curse of dimensionality at 97 training rows). Re-enabling is gated by `cfg.haralick_enable = True`.
+
+## Shape features (5 segment-level)
+
+Derived from the segment label raster:
+
+| Feature | Description |
+|---------|-------------|
+| `area_m2__seg` | Segment area in square metres |
+| `perimeter_m__seg` | Perimeter length (4-connected edge counting) |
+| `compactness__seg` | 4π × area / perimeter² |
+| `elongation__seg` | Bounding-box major / minor axis ratio |
+| `fill_ratio__seg` | Area / bounding-box area |
+
+## Zonal statistics
+
+All pixel features are summarised per segment via **zonal mean and standard deviation** — two segment features per pixel feature. The standard deviation captures within-segment variability (e.g. a heterogeneous segment with mixed vegetation will have high std across spectral bands).
+
+Segments with fewer than 4 in-AOI pixels are flagged as boundary slivers and dropped from training.
+
+### Median imputation
+
+Some PlanetScope epochs have a 1–2 pixel ragged edge in certain bands (observed: `sep25_b1`, `nov25_b1`). Rather than dropping all segments that touch this edge, v3 median-imputes partial-NaN features:
+
+```python
+non_sliver = ~seg_df[feature_cols].isna().all(axis=1)
+medians = seg_df.loc[non_sliver, feature_cols].median()
+seg_df.loc[non_sliver, feature_cols] = (
+    seg_df.loc[non_sliver, feature_cols].fillna(medians)
+)
+```
+
+This recovered 13 labeled segments in the 2026-05-03 run, including 6 of 6 newly-added Production Forest samples that sat on the edge.

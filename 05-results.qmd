@@ -1,0 +1,169 @@
+# Results
+
+## Segmentation comparison
+
+Tightening the LSMS parameters from the coarse to the fine setting roughly quintupled the segment count and had a large positive effect on accuracy:
+
+| Metric | Coarse (60k segs) | Fine (316k segs) | Change |
+|--------|:-----------------:|:----------------:|:------:|
+| px / segment | 485 | 93 | −5× |
+| Training rows | 373 | 762 | +104% |
+| Holdout OA | 0.852 | 0.873 | +2.1pp |
+| Holdout kappa | 0.825 | 0.851 | +2.6pp |
+| CV OA | 0.810 ± 0.049 | **0.887 ± 0.017** | +7.7pp, stdev ÷3 |
+| CV kappa | 0.775 ± 0.059 | **0.867 ± 0.020** | +9.2pp |
+| Top-20 CV OA | 0.748 ± 0.046 | 0.887 ± 0.020 | +13.9pp |
+
+Two effects compound: finer segments align better with real-world boundaries (a single coarse segment no longer spans both forest and clearing), and more sample points land in unique segments rather than being collapsed by majority vote — effectively doubling the training set.
+
+The CV standard deviation dropping from ±4.9pp to ±1.7pp is especially meaningful: the fine model is **far more stable across folds**.
+
+## L1 accuracy (8-class legacy scheme, 2026-05-02)
+
+```json
+{
+  "n_segments":       316209,
+  "n_training_rows":     762,
+  "n_features_total":    591,
+  "all_features": {
+    "holdout_accuracy": 0.873,
+    "holdout_kappa":    0.851,
+    "cv_accuracy_mean": 0.887,
+    "cv_accuracy_std":  0.017,
+    "cv_kappa_mean":    0.867
+  },
+  "top_20": {
+    "holdout_accuracy": 0.873,
+    "holdout_kappa":    0.852,
+    "cv_accuracy_mean": 0.887,
+    "cv_kappa_mean":    0.867
+  }
+}
+```
+
+Top-20 matches full-feature performance — consistent with model saturation once segments are homogeneous.
+
+## L1 accuracy (7-class hierarchical scheme, 2026-05-03)
+
+Dropping Bareland raised all metrics:
+
+| Metric | 8-class | 7-class | Change |
+|--------|--------:|--------:|-------:|
+| Holdout OA | 0.873 | **0.895** | +2.2pp |
+| Holdout kappa | 0.851 | **0.875** | +0.024 |
+| CV OA | 0.887 ± 0.017 | **0.920 ± 0.016** | +3.3pp |
+| CV kappa | 0.867 ± 0.020 | **0.905 ± 0.019** | +0.038 |
+| Top-20 holdout | 0.873 | **0.928** | +5.5pp |
+
+### Per-class F1 (228 validation segments)
+
+| Class | F1 | Notes |
+|-------|----|-------|
+| Waterbody | 0.93 | |
+| Paddy | 0.89 | |
+| Built-up | 0.90 | |
+| Others | 0.97 | |
+| Dense Vegetation | 0.83 | Split into subtypes at L2 |
+| Sparse Vegetation | 0.82 | +0.25 vs 8-class coarse |
+| Crops | 0.91 | +0.24 vs 8-class coarse |
+
+Every class reached F1 ≥ 0.82. Sparse Vegetation and Crops — the previously confused classes — improved substantially with finer segments.
+
+## Top-15 features by RF importance
+
+Gini importance summed across all 591 features = 1:
+
+| Rank | Feature | Importance | Group |
+|------|---------|-----------|-------|
+| 1 | `tree_height_mean__mean` | 0.0192 | Tree_Height |
+| 2 | `ampNDBI__mean` | 0.0133 | Temporal_MinMaxStd |
+| 3 | `tree_height_std__mean` | 0.0128 | Tree_Height |
+| 4 | `ampNDVI__mean` | 0.0124 | Temporal_MinMaxStd |
+| 5 | **`PALSAR_HV_db__mean`** | **0.0121** | SAR_PALSAR |
+| 6 | `sept_NDBI__mean` | 0.0121 | NDBI_Indices |
+| 7 | `sept_NDWI__mean` | 0.0113 | NDWI_Indices |
+| 8 | `march_VARI__mean` | 0.0109 | VARI_Indices |
+| 9 | `sept_NDRE__mean` | 0.0100 | NDRE_Indices |
+| 10 | `harmOffsetNDVI__mean` | 0.0100 | Temporal_Harmonic |
+| 11 | `sept_OSAVI__mean` | 0.0099 | OSAVI_Indices |
+| 12 | `harmOffsetGNDVI__mean` | 0.0096 | Temporal_Harmonic |
+| 13 | `p50NDVI__mean` | 0.0093 | Temporal_Percentiles |
+| 14 | `sept_BSI__mean` | 0.0090 | BSI_Indices |
+| 15 | `jan25_VARI__mean` | 0.0089 | VARI_Indices |
+
+Canopy height dominates (#1 and #3). PALSAR_HV ranks #5 — L-band penetrates dense canopy and carries biomass information unavailable in optical data. September is the most informative single date (dry season; maximum contrast between bare soil, senescent crops, and evergreen forest).
+
+## Meta v2 canopy-height impact
+
+Adding Meta v2 canopy statistics (8 features) on top of the ETH legacy features:
+
+| Model | Holdout OA | Change |
+|-------|-----------|--------|
+| Without Meta v2 | 0.895 | — |
+| With Meta v2 | 0.899 | +0.4pp |
+
+The L1 gain is modest (near saturation). The L2 gain is larger:
+
+| L2 metric | Without | With | Change |
+|-----------|--------:|-----:|-------:|
+| Holdout OA | 0.575 | 0.625 | +5.0pp |
+| Holdout kappa | 0.324 | 0.399 | +7.5pp |
+| Natural F1 | 0.59 | 0.67 | +0.08 |
+| Production F1 | 0.50 | 0.58 | +0.08 |
+| Agroforest F1 | 0.62 | 0.62 | 0 |
+
+Meta v2 features `meta_canopy_p95__mean` and `meta_canopy_avg__mean` are the #1 and #2 most important single features in the full 599-feature stack when Meta v2 is included — beating every spectral, temporal, and SAR feature.
+
+## L2 forest-subtype results (2026-05-03, 137 samples)
+
+| Metric | Value |
+|--------|-------|
+| Training rows (after imputation) | 137 |
+| Train / val | 97 / 40 |
+| Holdout OA | 0.575 |
+| Holdout kappa | 0.324 |
+| CV OA | 0.649 ± 0.076 |
+| CV kappa | 0.432 ± 0.122 |
+
+### Confusion matrix (validation set, 40 segments)
+
+| | Predicted Natural | Predicted Production | Predicted Agroforest |
+|-|:-----------------:|:--------------------:|:--------------------:|
+| True Natural (n=18) | 11 | 5 | 2 |
+| True Production (n=14) | **7** | 7 | 0 |
+| True Agroforest (n=8) | 1 | 2 | 5 |
+
+Per-class F1: Natural 0.59, **Production 0.50**, Agroforest 0.67.
+
+The dominant failure mode is Production classified as Natural (7/14). Both subtypes have tall, dense canopy; the structural features that should separate them (`tree_height_std`, `S1_VV_stdDev`, `PALSAR_HV_db`) are present in the model but 48 Production training rows is too thin to learn the management-cycle pattern reliably. Adding 30–50 more clearly identifiable Production stands (planting rows visible in Wayback) is the primary recommended action.
+
+## Why Bareland was dropped
+
+Bareland was the weakest L1 class by far (F1 = 0.00 coarse, 0.36 fine). The cause is structural: **Cisokan has very little permanently exposed soil.** "Bareland" labels in this AOI capture transient states — harvested paddy, dry-season fallow, edge artefacts — not stable land cover. Forcing the classifier to learn a coherent Bareland concept injected noise into adjacent classes (Sparse Vegetation and Crops).
+
+Recommended reassignment of existing class-8 sample points:
+
+| Pixel context | Reassign to |
+|--------------|-------------|
+| Fallow / harvested cropland | **9 Crops** |
+| Bare riverbank, eroded slope, sparse scrub | **8 Sparse Vegetation** |
+| Road, building, anthropogenic bare | **3 Built-up** |
+| Cloud shadow, edge artefact, ambiguous | **4 Others** |
+
+Quick triage: if NDVI is low across all 10 epochs → Sparse Veg or Built-up. If NDVI swings high–low → Crops.
+
+## Final pixel distribution (2026-05-03)
+
+| Class | % of AOI |
+|-------|:--------:|
+| Waterbody | 0.3% |
+| Paddy | 14.3% |
+| Built-up | 7.7% |
+| Others | 1.2% |
+| Natural Forest | 15.1% |
+| Production Forest | 7.2% |
+| Agroforest | 3.0% |
+| Sparse Vegetation | 45.9% |
+| Crops | 5.3% |
+
+Sparse Vegetation at 46% warrants a sanity-check overlay in QGIS. Some of those patches may be Agroforest fringe. If so, the fix is more Agroforest training samples (currently the lowest at 30 L2 samples).

@@ -1,0 +1,224 @@
+# Script Reference
+
+## `planetscope_10epoch_obia_v3.py` — Main classifier
+
+The canonical end-to-end OBIA pipeline. Run order and cache awareness:
+
+```bash
+# First time (all caches cold)
+.venv/bin/python -u planetscope_10epoch_obia_v3.py   # ~45–90 min
+
+# Warm run (segmentation + features cached)
+.venv/bin/python -u planetscope_10epoch_obia_v3.py   # ~5–8 min
+
+# After adding samples (no feature changes)
+.venv/bin/python -u planetscope_10epoch_obia_v3.py   # ~5–8 min
+
+# After feature-engineering changes
+rm -rf outputs_10epoch_obia_v3/feature_cache_v3
+.venv/bin/python -u planetscope_10epoch_obia_v3.py   # recomputes features
+```
+
+### Key `Config` fields
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `seg_spatialr` | 3 | LSMS spatial search radius |
+| `seg_ranger` | 12.0 | LSMS spectral range |
+| `seg_minsize` | 50 | LSMS minimum segment size |
+| `force_resegment` | `False` | Rebuild segmentation from scratch |
+| `rf_trees` | 100 | Random Forest tree count |
+| `train_fraction` | 0.7 | 70/30 holdout split |
+| `n_cv_folds` | 5 | Cross-validation folds |
+| `top_n_features` | 20 | Top-N subset model |
+| `l2_enable` | `True` | Run the L2 forest-subtype model |
+| `l2_method` | `"random_forest"` | `"polygon"` or `"random_forest"` |
+| `haralick_enable` | `False` | Enable Haralick GLCM textures |
+| `yrf_apply` | `False` | Apply the YRF post-hoc rule |
+| `ps_only` | `False` | Drop SAR and canopy height (ablation) |
+| `epochs_subset` | `None` | Restrict to one epoch (ablation) |
+
+### Outputs
+
+All outputs land in `outputs_10epoch_obia_v3/`:
+
+| File | Description |
+|------|-------------|
+| `PS_LandCover_OBIA_v3.tif` | L1 classification (full features) |
+| `PS_LandCover_OBIA_v3_Top20.tif` | L1 classification (top-20 features) |
+| `PS_LandCover_OBIA_v3_Final.tif` | Final 9-class hierarchical map |
+| `summary.json` | Headline metrics |
+| `confusion_matrix_all.csv` | L1 holdout confusion matrix |
+| `per_class_metrics_all.csv` | Per-class precision / recall / F1 |
+| `feature_importance_obia_v3.csv` | Gini importance for all 591 features |
+| `feature_group_analysis_obia_v3.csv` | Per-group importance totals |
+| `temporal_group_analysis_obia_v3.csv` | Per-epoch importance totals |
+| `cv_results_obia_v3_all_features.csv` | 5-fold CV detail |
+| `class_distribution.csv` | Training segment counts per class |
+| `final_class_distribution.csv` | Final-class pixel counts in AOI |
+| `training_segments_labeled.csv` | Segment-to-class mapping used for training |
+
+---
+
+## `planetscope_10epoch_local.py` — Pixel feature cache builder
+
+**Must run before `planetscope_10epoch_obia_v3.py`** on a fresh setup. Reads the 10 PlanetScope GeoTIFFs, computes per-epoch NDVI/NDWI/NDBI/EVI and temporal summaries, and writes 138 single-band feature TIFs to `outputs_10epoch/feature_cache/`.
+
+```bash
+.venv/bin/python -u planetscope_10epoch_local.py
+```
+
+Also trains its own pixel-level Random Forest (legacy) and writes full-raster classifications to `outputs_10epoch/`. These are not used by the OBIA v3 pipeline — only the `feature_cache/` is consumed.
+
+---
+
+## `build_sar_features.py` — SAR feature download
+
+Downloads Sentinel-1 and PALSAR-2 feature stacks from Earth Engine and writes them as local GeoTIFFs.
+
+```bash
+# Default: both sensors at 30 m (direct download)
+.venv/bin/python build_sar_features.py
+
+# Only Sentinel-1
+.venv/bin/python build_sar_features.py --skip-palsar
+
+# Only PALSAR
+.venv/bin/python build_sar_features.py --skip-s1
+
+# Full resolution at 10 m (routes through Google Drive)
+.venv/bin/python build_sar_features.py --scale 10
+```
+
+At 30 m the Cisokan AOI downloads in a single request (S1: 1.6 MB, PALSAR: 5.1 MB). At 10 m the S1 stack exceeds Earth Engine's direct-download cap and must go through Drive; download the resulting file from Drive and rename it to `S1_temporal_features.tif`.
+
+---
+
+## `ee_init.py` — Earth Engine authentication
+
+Initialises Earth Engine via service account or user OAuth. Reads `GEE_PROJECT_ID`, `GEE_SERVICE_ACCOUNT_EMAIL`, and `GEE_SERVICE_ACCOUNT_KEY_FILE` from the environment, falling back to hardcoded defaults.
+
+```bash
+# Test that credentials work
+.venv/bin/python ee_init.py
+# Expected: "EE round-trip on project ...: 1 + 1 = 2"
+```
+
+Imported by `build_sar_features.py`; not called directly in production.
+
+---
+
+## `download_meta_canopy_v2.py` — Meta canopy height
+
+Downloads four canopy-height statistics from Meta's Data-for-Good S3 bucket anonymously (no AWS credentials needed). Streams only the AOI window via `/vsis3/` COG partial reads, reprojects to EPSG:32748 at 3 m.
+
+```bash
+.venv/bin/python download_meta_canopy_v2.py
+# Writes: rasters/meta_v2/canopy_height_v2_{avg,stdev,p95,cover}.tif
+```
+
+Source tiles are uint16; the script masks the 65535 nodata sentinel and applies the correct scale (÷100 for heights in metres, ÷1000 for cover as fraction) before writing.
+
+---
+
+## `curate_samples_for_obia.py` — Sample curation
+
+Reduces `samples.gpkg` to one representative point per LSMS segment and identifies conflicting points (multiple classes in the same segment).
+
+```bash
+# Step 1: generate curated file + conflicts
+.venv/bin/python curate_samples_for_obia.py
+
+# Step 2: resolve conflicts in QGIS
+# Open conflicts.gpkg alongside samples.gpkg and segments.gpkg.
+# Delete wrong-class points, save.
+
+# Step 3: merge reviewed conflicts back in
+# Set REVIEWED_CONFLICTS = True in the script, then re-run.
+.venv/bin/python curate_samples_for_obia.py
+```
+
+Writes:
+
+- `samples_curated.gpkg` — one point per clean segment
+- `conflicts.gpkg` — all points from conflict segments (for QGIS review)
+- `curation_report.csv` — class counts before and after curation
+
+---
+
+## `separability_plot.py` — Class separability visualisation
+
+Generates a three-panel figure from the legacy 138-feature training CSV:
+
+1. **Heatmap** — pairwise Fisher-like separability distance between all class pairs.
+2. **Isolation ranking** — mean distance to all other classes (most isolated → easiest to classify).
+3. **Confusion-pair graph** — nodes on a circle, red edges for the hardest pairs, green dashed for the most separated.
+
+```bash
+.venv/bin/python separability_plot.py
+# Writes: outputs_10epoch/separability_overview.png and .pdf
+```
+
+---
+
+## `spectral_signature_plot.py` — Spectral signature visualisation
+
+Two-panel figure across all 138 features:
+
+1. **Top panel** — raw 8-band reflectance per epoch, stacked for all 10 epochs.
+2. **Bottom panel** — all 138 features (mean ± 1σ shaded) with group dividers (per-epoch, temporal summaries, tree height).
+
+```bash
+.venv/bin/python spectral_signature_plot.py
+# Writes: outputs_10epoch/spectral_signatures_138bands.png and .pdf
+```
+
+---
+
+## SAM segmentation scripts
+
+An alternative segmenter using Meta's Segment Anything Model (ViT-B). Produces finer, edge-aware polygon boundaries that can be used to subdivide the L1=Dense Vegetation mask for L2 photo-interpretation.
+
+### Workflow
+
+```bash
+# 1. Prepare the RGB input and Dense mask
+.venv/bin/python sam_preprocess.py
+# Writes: rasters/sam_input_aoi_rgb.tif
+#         rasters/sam_input_wz_dense_mask.tif
+
+# 2. Run SAM (downloads ViT-B checkpoint ~360 MB on first run)
+.venv/bin/python sam_run.py
+# Writes: rasters/sam_output/sam_segments.tif
+#         rasters/sam_output/sam_segments.gpkg
+
+# 3a. Filter + fill residuals
+.venv/bin/python sam_filter.py
+# Writes: outputs_10epoch_obia_v3/sam_l2_candidates.gpkg
+
+# 3b. (Alternative) subdivide Dense components with SAM cut lines
+.venv/bin/python sam_option_a.py
+```
+
+### `sam_preprocess.py`
+
+Reads `World Imagery_9862E977172.tif` (ESRI World Imagery, UInt32 4-band EPSG:3857), clips to the WZ envelope, casts bands 1–3 to uint8, reprojects to EPSG:32748. Also builds the L1=Dense binary mask from `PS_LandCover_OBIA_v3.tif`.
+
+Feeds SAM the unmasked natural RGB (not zeroed outside Dense) — zeroing non-Dense pixels creates large uniform black regions that SAM over-segments as a single object.
+
+### `sam_run.py`
+
+Runs `SamGeo` (ViT-B) on the preprocessed RGB COG. Tile size 1024×1024 px, overlap 256 px. On Apple Silicon MPS this takes ~15–30 minutes for the 1 Gpx WZ-clipped image.
+
+### `sam_filter.py`
+
+Filters the raw SAM output:
+
+1. Drop polygons < 0.05 ha (noise).
+2. Clip every polygon to the L1=Dense mask.
+3. Drop clipped polygons still < 0.05 ha.
+4. Fill Dense pixels not covered by any SAM polygon as "residual" segments.
+
+### `sam_option_a.py`
+
+Alternative approach: vectorise the L1=Dense mask as connected components, then use SAM polygon boundaries as cut lines to subdivide each component. Produces polygons that match the L1=Dense footprint exactly.

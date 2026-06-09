@@ -1,0 +1,72 @@
+# Preface {.unnumbered}
+
+This book documents the end-to-end land-cover classification pipeline built for the **Cisokan watershed**, West Java, Indonesia. The pipeline combines multi-temporal PlanetScope satellite imagery with C-band Sentinel-1 SAR, L-band PALSAR-2, and high-resolution canopy height data to produce a 9-class hierarchical land-cover map at 3 m resolution.
+
+## What this pipeline does
+
+The pipeline uses **Object-Based Image Analysis (OBIA)**: rather than classifying individual pixels, it first groups neighbouring pixels into spatially homogeneous segments (objects), then trains a Random Forest classifier on segment-level features. This avoids the salt-and-pepper noise common in pixel-based classifiers and produces clean, polygon-like output that reads naturally in QGIS.
+
+Classification is **hierarchical** — two Random Forest models stacked in sequence:
+
+- **L1** classifies all segments into 7 land-cover types including a broad "Dense Vegetation" class.
+- **L2** re-classifies Dense Vegetation segments into 3 forest subtypes: Natural Forest, Production Forest, and Agroforest.
+
+```
+PlanetScope (10 epochs, 3 m)  ─┐
+Sentinel-1 SAR (30 m)          ├─► 591 features per segment ─► L1 Random Forest (7 classes)
+PALSAR-2 (30 m)                │                                      │
+Canopy height (ETH + Meta)    ─┘                              Dense Veg segments only
+                                                                       │
+                                                              L2 Random Forest (3 subtypes)
+                                                                       │
+                                                              Final 9-class map
+```
+
+## Key results
+
+Verified on 2026-05-03 with 316,209 fine LSMS segments:
+
+| Level | Holdout OA | Kappa | 5-fold CV OA |
+|-------|-----------|-------|--------------|
+| L1 (7 classes, Bareland dropped) | **89.5%** | 0.875 | 92.0% ± 1.6% |
+| L2 (3 forest subtypes) | 57.5% | 0.324 | 64.9% ± 7.6% |
+
+The L1 model is robust. The L2 model is limited by sample count — specifically Production Forest, which is confused with Natural Forest. Adding 30–50 more unambiguous Production stands is the highest-value next step.
+
+## Final class scheme
+
+| ID | Class | Source |
+|----|-------|--------|
+| 1 | Waterbody | L1 |
+| 2 | Paddy | L1 |
+| 3 | Built-up | L1 |
+| 4 | Others | L1 |
+| 5 | Natural Forest | L2 within Dense Vegetation |
+| 6 | Production Forest | L2 within Dense Vegetation |
+| 7 | Agroforest | L2 within Dense Vegetation |
+| 8 | Sparse Vegetation | L1 |
+| 9 | Crops | L1 |
+
+## AOI pixel distribution (2026-05-03 run)
+
+| Class | % of AOI |
+|-------|----------|
+| Waterbody | 0.3% |
+| Paddy | 14.3% |
+| Built-up | 7.7% |
+| Others | 1.2% |
+| Natural Forest | 15.1% |
+| Production Forest | 7.2% |
+| Agroforest | 3.0% |
+| Sparse Vegetation | 45.9% |
+| Crops | 5.3% |
+
+## Software
+
+| Component | Version |
+|-----------|---------|
+| Python | 3.14.4 (Homebrew) |
+| OTB (segmentation) | 8.1.2 |
+| scikit-learn | latest |
+| rasterio | ≥ 1.5 |
+| Earth Engine API | latest |

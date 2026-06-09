@@ -1,0 +1,102 @@
+# Setup & Installation
+
+## Python environment
+
+The pipeline requires Python 3.14 and OTB 8.1.2. On macOS arm64, `rasterio` and `pyogrio` ship GDAL bundled in their wheels — no `brew install gdal` is needed.
+
+```bash
+# Create the virtual environment
+/opt/homebrew/bin/python3.14 -m venv .venv
+
+# Install dependencies
+.venv/bin/pip install --upgrade pip wheel
+.venv/bin/pip install -r requirements.txt
+```
+
+### SAM dependencies (optional)
+
+The SAM segmentation scripts (`sam_run.py`) require `torch` and `samgeo`. Install separately because the correct `torch` build depends on your platform:
+
+```bash
+# Apple Silicon (MPS)
+.venv/bin/pip install torch torchvision
+.venv/bin/pip install samgeo
+
+# Linux with CUDA
+.venv/bin/pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+.venv/bin/pip install samgeo
+```
+
+## OTB (Orfeo Toolbox)
+
+OTB is required for the LSMS segmentation step. Download the macOS binary from the [OTB release page](https://www.orfeo-toolbox.org/download/) and extract to `~/OTB-8.1.2-Darwin64`.
+
+The pipeline expects OTB at `~/OTB-8.1.2-Darwin64` by default. Override by setting `cfg.otb_home` in `Config` if your install is in a different location.
+
+## Earth Engine credentials
+
+`ee_init.py` authenticates via a GEE service account. It reads three environment variables, falling back to built-in defaults for this machine if they are unset:
+
+| Variable | Default |
+|----------|---------|
+| `GEE_PROJECT_ID` | `ee-geodeticengineeringundip` |
+| `GEE_SERVICE_ACCOUNT_EMAIL` | `sci-eudr@ee-geodeticengineeringundip.iam.gserviceaccount.com` |
+| `GEE_SERVICE_ACCOUNT_KEY_FILE` | `~/Github/forest-analyzer/config/ee-geodetic.json` |
+
+To override on a different machine, export the variables before running any script:
+
+```bash
+export GEE_PROJECT_ID=your-project-id
+export GEE_SERVICE_ACCOUNT_EMAIL=your-sa@your-project.iam.gserviceaccount.com
+export GEE_SERVICE_ACCOUNT_KEY_FILE=~/path/to/key.json
+```
+
+Or source the provided `csk.env` file:
+
+```bash
+set -a; source csk.env; set +a
+```
+
+### Smoke test
+
+```bash
+.venv/bin/python ee_init.py
+# Expected: "EE round-trip on project ee-geodeticengineeringundip: 1 + 1 = 2"
+```
+
+## Directory layout
+
+```
+CSK/
+  planetscope_10epoch_obia_v3.py    Main OBIA classifier
+  planetscope_10epoch_local.py      Pixel feature cache builder (prereq)
+  build_sar_features.py             SAR download from Earth Engine
+  ee_init.py                        EE auth helper
+  download_meta_canopy_v2.py        Meta v2 canopy height downloader
+  curate_samples_for_obia.py        Sample curation tool
+  separability_plot.py              Class separability visualization
+  spectral_signature_plot.py        Spectral signature visualization
+  sam_preprocess.py                 SAM input preparation
+  sam_run.py                        SAM segmentation
+  sam_filter.py                     SAM polygon filter
+  sam_option_a.py                   SAM subdivision option
+
+  samples.gpkg                      Training points (L1 + L2 labels)
+  aoi_cisokan.gpkg                  AOI polygon (UTM 48S / EPSG:32748)
+  canopy_height.tif                 ETH 2020 canopy height (10 m)
+  rasters/                          10 PlanetScope epoch GeoTIFFs
+    meta_v2/                        Meta v2 canopy height layers (3 m)
+  S1_temporal_features.tif          Output of build_sar_features.py
+  PALSAR_features.tif               Output of build_sar_features.py
+
+  outputs_10epoch/                  Pixel feature cache (planetscope_10epoch_local.py)
+    feature_cache/                  138 single-band feature TIFs
+  outputs_10epoch_obia_v3/          OBIA v3 outputs
+    feature_cache_v3/               Extended feature cache (new indices + temporal)
+    lsms_labels.tif                 Segment label raster
+    seg_composite.tif               4-band composite used for segmentation
+    PS_LandCover_OBIA_v3.tif        L1 classification raster
+    PS_LandCover_OBIA_v3_Final.tif  Final 9-class raster
+    summary.json                    Headline metrics
+    *.csv                           Confusion matrices, per-class F1, feature importance
+```

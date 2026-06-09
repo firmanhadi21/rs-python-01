@@ -1,0 +1,222 @@
+# Pipeline Stages
+
+The main script `planetscope_10epoch_obia_v3.py` runs 13 stages end-to-end. Caching means that on a warm run (segmentation and feature TIFs already built), the total wall-clock time is ~5–8 minutes.
+
+## Running the pipeline
+
+### Common case (after editing samples)
+
+```bash
+.venv/bin/python -u planetscope_10epoch_obia_v3.py
+```
+
+### Refreshing SAR features
+
+```bash
+.venv/bin/python build_sar_features.py
+.venv/bin/python -u planetscope_10epoch_obia_v3.py
+```
+
+`build_sar_features.py` accepts several flags:
+
+| Flag | Effect |
+|------|--------|
+| `--scale 10` | Full-resolution SAR at 10 m via Google Drive (slower) |
+| `--via-drive` | Force Drive export even at 30 m |
+| `--skip-s1` | Only refresh PALSAR |
+| `--skip-palsar` | Only refresh Sentinel-1 |
+
+### Clean rebuild (after feature-engineering changes)
+
+```bash
+rm -rf outputs_10epoch_obia_v3/feature_cache_v3
+.venv/bin/python -u planetscope_10epoch_obia_v3.py
+```
+
+## Stage 0 — Pixel feature inventory
+
+Lists all pixel features that will be computed or read from cache:
+
+- **138 legacy features** from `outputs_10epoch/feature_cache/` (built by `planetscope_10epoch_local.py`)
+- **100 new per-epoch indices** (computed or read from `feature_cache_v3/`)
+- **28 temporal features** (percentiles, harmonic, YoY)
+- Optional: topographic features (skipped if `dem.tif` missing)
+- Optional: Haralick GLCM features (disabled by default)
+
+## Stage 1 — Segmentation
+
+LSMS (Large-Scale Mean-Shift) segmentation via OTB. The input is a 4-band temporal-median composite (NDVI, NDWI, NDBI, EVI), percentile-stretched to 0–255.
+
+### Parameters (v3 fine segmentation)
+
+| Parameter | Value | Effect |
+|-----------|-------|--------|
+| `spatialr` | 3 | Spatial search radius (pixels) |
+| `ranger` | 12.0 | Spectral range (intensity units) |
+| `minsize` | 50 | Minimum segment size (pixels) |
+
+These produce **316,209 segments** averaging 93 pixels each (vs 60,682 segments / 485 px/seg for the earlier coarse run). Finer segments capture real-world boundaries better and double the effective training set because more sample points land in unique segments.
+
+### Segmentation reuse
+
+The pipeline reuses an existing `lsms_labels.tif` if it finds one in `outputs_10epoch_obia_v3/` (or earlier output directories). Set `cfg.force_resegment = True` to rebuild from scratch.
+
+OTB pipeline steps:
+
+```
+otbcli_MeanShiftSmoothing      → lsms_smoothed.tif, lsms_spatial.tif
+otbcli_LSMSSegmentation        → lsms_labels_raw.tif
+otbcli_LSMSSmallRegionsMerging → lsms_labels.tif
+otbcli_LSMSVectorization       → segments.gpkg  (non-fatal if fails)
+```
+
+## Stage 2 — Zonal mean + std
+
+For each of the ~266 pixel features, compute the mean and standard deviation across all pixels within each segment. The result is 532 zonal features (266 × 2) stored in a segment-level DataFrame.
+
+Implementation uses `numpy.bincount` for efficiency:
+
+```python
+count = np.bincount(lbl, minlength=n_seg + 1)
+s     = np.bincount(lbl, weights=val, minlength=n_seg + 1)
+sq    = np.bincount(lbl, weights=val * val, minlength=n_seg + 1)
+mean  = s / count
+std   = np.sqrt(sq / count - mean ** 2)
+```
+
+Wall-clock: ~4 minutes on first run.
+
+## Stage 3 — Texture, shape, and SAR
+
+Three sub-stages run after the zonal stats:
+
+1. **Texture** — 6 segment-level features from temporal-median NDVI and NIR.
+2. **Shape** — 5 geometric features from the label raster.
+3. **SAR** — zonal mean + std per band from `S1_temporal_features.tif` and `PALSAR_features.tif`, reprojected to the PlanetScope grid before aggregation.
+
+SAR files are optional: missing files are skipped with a warning and the pipeline continues without them.
+
+## Stage 4 — Segment DataFrame assembly
+
+All feature arrays are assembled into a single Pandas DataFrame indexed by `segment_id` (1 … n_seg). Boundary slivers (<4 pixels) are set to all-NaN. Partial-NaN columns are median-imputed.
+
+## Stage 5 — Training-point to segment labeling
+
+For L1:
+
+1. Read `samples.gpkg`, filter to valid L1 class IDs.
+2. Map each point to its enclosing segment via nearest-pixel lookup.
+3. Per segment: count votes by class across all points inside it.
+4. Keep segments with a **strict majority** (top class > second class). Ties are discarded.
+
+This is the **v1 majority-vote scheme** — v2 expanded each point to a row with sample weights, which introduced cross-split label conflicts and caused a regression from ~84% OA to ~60% OA.
+
+## Stage 6 — 70/30 holdout
+
+A fixed random seed (42) splits the labeled segments 70/30. The same seed is used for L1 and L2 (L2 uses seed + 1) so results are reproducible.
+
+## Stage 7 — Random Forest training (L1)
+
+```python
+RandomForestClassifier(
+    n_estimators=100,
+    min_samples_leaf=1,
+    max_samples=0.5,       # bag_fraction
+    bootstrap=True,
+    max_features="sqrt",
+    random_state=42,
+    n_jobs=-1,
+)
+```
+
+Both a **full-feature model** (all 591 features) and a **top-20 subset model** are trained and reported. In practice they perform identically once segments are homogeneous enough — confirming that most of the 591 features are redundant.
+
+## Stage 8 — Feature importance and group analysis
+
+Gini feature importances are written to `feature_importance_obia_v3.csv`. A grouping function maps each feature to a named group (SAR_S1, SAR_PALSAR, Spectral_Bands, NDVI_Indices, Temporal_Harmonic, Tree_Height, Shape, Texture, etc.) and computes per-group totals and averages.
+
+A separate epoch-level analysis reports which of the 10 PlanetScope dates contributes the most information.
+
+## Stage 9 — 5-fold cross-validation
+
+```python
+KFold(n_splits=5, shuffle=True, random_state=42)
+```
+
+Run on all labeled segments (not just the training split). CV OA and kappa are reported for both the full-feature and top-20 models.
+
+## Stage 10 — Full-raster prediction (L1)
+
+A LUT-based approach: predict the class for each unique `segment_id` once, then apply a lookup table to the full label raster. This avoids re-running inference per pixel and is memory-efficient for 316k segments.
+
+Two output rasters: `PS_LandCover_OBIA_v3.tif` (full features) and `PS_LandCover_OBIA_v3_Top20.tif`.
+
+## Stage 11 — L2 forest-subtype assignment
+
+Dense Vegetation segments (L1 class = 5) are assigned forest subtypes. Two modes are available via `cfg.l2_method`:
+
+### Polygon overlay (canonical)
+
+```python
+cfg.l2_method = "polygon"
+```
+
+Reads a digitised shapefile of Natural Forest, Production Forest, and Agroforest polygons. Each Dense segment is assigned the majority polygon class over its pixels. Segments outside any polygon default to Agroforest (the most common un-digitised dense type in this AOI).
+
+### Random Forest (ablation / exploratory)
+
+```python
+cfg.l2_method = "random_forest"
+```
+
+Trains a second Random Forest on the labeled-Dense subset using the same 591 features. RF-mode outputs are suffixed `_RF` so they coexist with canonical outputs.
+
+Current L2 RF performance (2026-05-03, 137 samples):
+
+| | Natural | Production | Agroforest |
+|---|--------:|-----------:|-----------:|
+| Natural (n=18) | 11 | 5 | 2 |
+| Production (n=14) | 7 | 7 | 0 |
+| Agroforest (n=8) | 1 | 2 | 5 |
+
+The dominant error is Production classified as Natural (7/14). Adding 30–50 more unambiguous Production samples is the single highest-value action for improving L2.
+
+## Stage 12 — Final hierarchical raster
+
+`predict_hierarchical()` combines L1 and L2 predictions into the final 9-class raster:
+
+```
+for each segment:
+    if L1 ≠ Dense Vegetation → remap to final ID (1-4, 8, 9)
+    if L1 = Dense Vegetation → apply L2 assignment (5, 6, or 7)
+```
+
+Output: `PS_LandCover_OBIA_v3_Final.tif`
+
+### YRF post-hoc rule (disabled)
+
+A rule to reclassify short-canopy, high-NDVI segments as Young Regenerated Forest was tested and disabled. With thresholds `canopy 3–10 m AND p50NDVI > 0.6`, it reclassified 20% of the AOI as YRF — far exceeding any plausible YRF extent. Re-enable with `cfg.yrf_apply = True` only if explicit YRF training samples are available.
+
+## Stage 13 — Summary outputs
+
+All metrics, distributions, and paths are written to `summary.json`. Per-class F1 and confusion matrices are in the CSV files. Feature importance is in `feature_importance_obia_v3.csv`.
+
+## SAR export pipeline (`build_sar_features.py`)
+
+Direct download at 30 m keeps file sizes well within Earth Engine's cap (~50 MB):
+
+- S1 19-band stack: **1.6 MB** at 30 m (vs ~230 MB at 10 m)
+- PALSAR 5-band: **5.1 MB** at 30 m
+
+At 10 m, the script automatically routes through Google Drive (`--scale 10`). Drive exports must be downloaded manually after the task completes.
+
+## Ablation switches
+
+`Config` supports two ablation flags for the paper's 2×2 experiment design:
+
+| Flag | Effect |
+|------|--------|
+| `epochs_subset = ["sept"]` | Use only one epoch's features (drops temporal features) |
+| `ps_only = True` | Drop all non-PlanetScope sources (SAR, canopy height, Meta v2) |
+
+Ablation output goes to a sibling directory with a suffix encoding the configuration (e.g. `outputs_10epoch_obia_v3_1ep_psonly/`) so canonical outputs are never overwritten.

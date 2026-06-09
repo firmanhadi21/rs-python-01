@@ -36,6 +36,10 @@ curation_report.csv
 .DS_Store
 __MACOSX/
 
+# Quarto (local render outputs)
+_book/
+.quarto/
+
 # Credentials and env
 *.env
 *.json

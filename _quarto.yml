@@ -1,0 +1,36 @@
+project:
+  type: book
+  output-dir: _book
+
+book:
+  title: "Cisokan Land Cover Classification"
+  subtitle: "OBIA Pipeline — PlanetScope, SAR & Canopy Height"
+  author: "Firman Hadi"
+  date: "2026"
+  repo-url: https://github.com/firmanhadi21/rs-python-01
+  repo-actions: [edit, issue]
+  sidebar:
+    search: true
+  chapters:
+    - index.qmd
+    - part: "Getting Started"
+      chapters:
+        - 01-setup.qmd
+        - 02-data.qmd
+    - part: "Pipeline"
+      chapters:
+        - 03-features.qmd
+        - 04-pipeline.qmd
+        - 05-results.qmd
+    - part: "Reference"
+      chapters:
+        - 06-scripts.qmd
+
+format:
+  html:
+    theme: cosmo
+    code-copy: true
+    code-overflow: wrap
+    toc: true
+    toc-depth: 3
+    number-sections: true
