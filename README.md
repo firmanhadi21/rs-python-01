@@ -13,6 +13,16 @@ Verified 2026-05-03 on 316k LSMS segments:
 | L1 (7 classes) | 89.5% | 0.875 | 92.0% ± 1.6% |
 | L2 (3 forest subtypes) | 57.5% | 0.324 | 64.9% ± 7.6% |
 
+> **These numbers are from the 10-epoch configuration.** The epoch set is now
+> **12 epochs, Mar 2024 – Aug 2026** (`Config.epoch_labels`), so the feature
+> counts below and the results above both predate the current config and need a
+> re-run to be restated. `CSK_112425.tif` (24 Nov 2025) is on disk but
+> deliberately held out.
+>
+> The L2 figure is also superseded by later work outside this repo: a revised
+> label rule (Perhutani *jenis tanaman* = Production, RIMBA ALAM = Natural)
+> reaches **OA 0.702, κ 0.508** on the same three subtypes.
+
 ## Class scheme
 
 | ID | Class | Source |

@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
-Object-based (OBIA) land-cover classification for the 10-epoch PlanetScope
+Object-based (OBIA) land-cover classification for the multi-epoch PlanetScope
 stack -- EXTENDED feature set (v3).
+
+Epoch set: 12 epochs, Mar 2024 -- Aug 2026 (see Config.epoch_labels). The file
+name still says "10epoch" for continuity with the docs and cache paths; the
+epoch count lives in the config, not the filename. CSK_112425.tif (24 Nov 2025)
+is available on disk but deliberately held out.
 
 v3 vs v2
 --------
@@ -18,7 +23,7 @@ v3 ADDS on top of v2:
      NDRE, CIre, RENDVI, SAVI, MSAVI2, OSAVI, GNDVI, ARVI, VARI, BSI
   2. Extra temporal descriptors
      p10 / p50 / p90 percentiles per index, harmonic fit (amplitude /
-     phase / offset) across the 10 epochs, year-over-year march deltas
+     phase / offset) across the epoch series, year-over-year march deltas
   3. Topographic covariates (optional -- skipped if DEM missing)
      slope, aspect (sin, cos), TPI, TRI
   4. Segment-only texture (pure numpy, fast)
@@ -136,9 +141,13 @@ class Config:
     palsar_band_names:      Optional[List[str]] = None
 
     # Filename per epoch label. Must match the cache keys exactly.
+    # 12 epochs, Mar 2024 -- Aug 2026. CSK_112425.tif (24 Nov 2025) is held out
+    # deliberately and must not be re-added without also updating
+    # planetscope_10epoch_local.py.
     epoch_labels: List[str] = field(default_factory=lambda: [
         "march", "june", "aug", "sept", "jan25",
-        "may25", "aug25", "sep25", "nov25", "mar26",
+        "may25", "aug25", "sep25", "mar26", "apr26",
+        "jul26", "aug26",
     ])
     epoch_files: Dict[str, str] = field(default_factory=lambda: {
         "march":  "CSK_032124.tif",
@@ -149,8 +158,10 @@ class Config:
         "may25":  "CSK_050525.tif",
         "aug25":  "CSK_081525.tif",
         "sep25":  "CSK_090725.tif",
-        "nov25":  "CSK_112425.tif",
         "mar26":  "CSK_031726.tif",
+        "apr26":  "CSK_041326.tif",
+        "jul26":  "CSK_070126.tif",
+        "aug26":  "CSK_080526.tif",
     })
     # Day-of-year for each epoch -- used for the harmonic fit. Approximate
     # seasonal positioning; does not need to be exact for feature extraction.
@@ -163,8 +174,10 @@ class Config:
         "may25": 125,   #  5 May 2025
         "aug25": 227,   # 15 Aug 2025
         "sep25": 250,   #  7 Sep 2025
-        "nov25": 328,   # 24 Nov 2025
         "mar26":  76,   # 17 Mar 2026
+        "apr26": 103,   # 13 Apr 2026
+        "jul26": 182,   #  1 Jul 2026
+        "aug26": 217,   #  5 Aug 2026
     })
 
     # -------- SuperDove band mapping (for NEW indices only) --------

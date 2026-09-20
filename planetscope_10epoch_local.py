@@ -84,8 +84,11 @@ class Config:
         "may25":  "CSK_050525.tif",   #  5 May 2025
         "aug25":  "CSK_081525.tif",   # 15 Aug 2025
         "sep25":  "CSK_090725.tif",   #  7 Sep 2025
-        "nov25":  "CSK_112425.tif",   # 24 Nov 2025
-        "mar26": "CSK_031726.tif"
+        #"nov25":  "CSK_112425.tif",   # 24 Nov 2025 -- held out deliberately
+        "mar26":  "CSK_031726.tif",   # 17 Mar 2026
+        "apr26":  "CSK_041326.tif",   # 13 Apr 2026
+        "jul26":  "CSK_070126.tif",   #  1 Jul 2026
+        "aug26":  "CSK_080526.tif",   #  5 Aug 2026
     })
 
     # Canopy height GeoTIFF (single-band, any CRS -- will be reprojected)
